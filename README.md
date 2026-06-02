@@ -1,20 +1,15 @@
 # Amparo 
 
-## 😮‍💨 Buscando acalmar os jovens modernos.
+## 😮‍💨 Buscando auxiliar no bem-estar psicológico dos adolescentes.
 
-Um aplicativo de apoio à saúde mental, que auxilie o usuário a melhorar seu bem-estar psicológico, oferecendo suporte emocional, atividades e monitoramento de hábitos saudáveis. 
+O aumento do uso excessivo de tecnologia e redes sociais contribui para o crescimento de ansiedade e depressão entre jovens. Soluções digitais podem fornecer intervenção precoce e suporte contínuo, impactando positivamente na qualidade de vida dos usuários.  
 
 
 ## 🛠️ Tecnologias Utilizadas
 
-* React Native via Expo
-* NPM
-* Firebase?
-* Javascript?
-
 | Categoria | Tecnologia |
 | :--- | :--- |
-| **Frontend** | Expo |
+| **Frontend** | Typescript |
 | **Backend** | Javascript? |
 | **Banco de Dados** | Firebase? |
 
@@ -31,11 +26,16 @@ Ainda não é possível executar o projeto pois está em desenvolvimento. Para e
 
 ### Entrar na Pasta
 
+PowerShell / CMD / GitBash:
+
 ```bash
 cd Amparo
 ```
 
-Windows (PowerShell / CMD):
+### Executar o projeto:
+
+PowerShell / CMD / GitBash:
+
 ```bash
 npx expo start
 ```
