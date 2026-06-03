@@ -27,6 +27,8 @@ O aumento do uso excessivo de tecnologia e redes sociais contribui para o cresci
 
 > **Nota:** É possível executar de forma nativa no próprio navegador.
 
+---
+
 ### 📂 Passo a passo
 
 #### Entrar na pasta do projeto
