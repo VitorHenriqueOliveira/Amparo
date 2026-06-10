@@ -13,6 +13,17 @@ O aumento do uso excessivo de tecnologia e redes sociais contribui para o cresci
 | **Backend** | Node.js (JavaScript) |
 | **Banco de Dados** | Firebase (Firestore ou Realtime Database) |
 
+## Equipe do Projeto
+
+O desenvolvimento do projeto foi realizado pela seguinte equipe:
+
+| Integrante      | Função         |
+| --------------- | -------------- |
+| Pedro Geballi   | Banco de Dados |
+| Carlos Gomes    | Front-end      |
+| Emerson Barbosa | Banco de Dados |
+| Sophia Prado    | Front-end      |
+| Vitor Oliveira  | Back-end       |
 
 ## ❓ Como Executar o Projeto
 
