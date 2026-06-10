@@ -7,23 +7,21 @@ O aumento do uso excessivo de tecnologia e redes sociais contribui para o cresci
 
 ## 🛠️ Tecnologias Utilizadas
 
-| Categoria | Tecnologia |
-| :--- | :--- |
-| **Mobile** | Typescript / React Native (Expo) |
-| **Backend** | Node.js (JavaScript) |
+| **Categoria**      | **Tecnologia**                            |
+| :----------------- | :---------------------------------------- |
+| **Backend**        | Node.js (JavaScript)                      |
+| **Mobile**         | Typescript / React Native (Expo)          |
 | **Banco de Dados** | Firebase (Firestore ou Realtime Database) |
 
 ## Equipe do Projeto
 
 O desenvolvimento do projeto foi realizado pela seguinte equipe:
 
-| Integrante      | Função         |
-| --------------- | -------------- |
-| Pedro Geballi   | Banco de Dados |
-| Carlos Gomes    | Front-end      |
-| Emerson Barbosa | Banco de Dados |
-| Sophia Prado    | Front-end      |
-| Vitor Oliveira  | Back-end       |
+| **Função**         | **Integrantes**                 |
+| :----------------- | :------------------------------ |
+| **Backend**        | Vitor Oliveira                  | 
+| **Mobile**         | Sophia Prado & Carlos Gomes     |
+| **Banco de Dados** | Emerson Barbosa & Pedro Geballi |
 
 ## ❓ Como Executar o Projeto
 
@@ -42,7 +40,15 @@ O desenvolvimento do projeto foi realizado pela seguinte equipe:
 
 ### 📂 Passo a passo
 
-#### Entrar na pasta do projeto
+#### Baixar o projeto
+
+PowerShell / CMD / GitBash:
+
+```bash
+git clone https://github.com/VitorHenriqueOliveira/Amparo
+```
+
+#### Entrar na pasta do Amparo
 
 PowerShell / CMD / GitBash:
 
@@ -66,7 +72,7 @@ PowerShell / CMD / GitBash:
 npx expo start
 ```
 
-#### Executar o servidor de desenvolvimento de Expo
+#### Link do servidor de desenvolvimento do Expo
 
 ```text
 http://localhost:8081
