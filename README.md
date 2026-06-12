@@ -79,3 +79,10 @@ http://localhost:8081
 ```
 
 > **Nota:** Se estiver utilizando o Expo Go: Um QR Code será exibido no terminal, abra o aplicativo Expo Go no seu celular e escaneie o código para visualizar o app.
+
+## ✅ Conceito de pronto
+
+- O código foi revisado por pelo menos outro desenvolvedor.
+- O testador não encontrou nenhum bug crítico.
+- Toda a documentação do sistema foi atualizada.
+- O código foi integrado ao repositório principal do projeto.
