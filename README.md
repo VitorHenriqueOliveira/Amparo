@@ -98,4 +98,6 @@ Uma funcionalidade nova será considerada concluída apenas quando atender os se
 
 Para mais detalhes sobre a documentação, especificações técnicas e pesquisas realizadas:
  
-- [Documentação](./documentacao)  
+- [Documentação](https://docs.google.com/document/d/1nOHPZHFb7zF-VEaVPTtvxNx0Jwl455FKO8_sslU9eu4/edit?usp=sharing)
+- [Especificação de Casos de Uso](https://docs.google.com/document/d/1Ck6EZCFioj6pZ4LhuvUBVGhGwfjaz90cURt_v9vB9Ec/edit?usp=sharing)
+- [Especificações Técnicas](https://docs.google.com/document/d/1xHQsBjWIKVvXDSzJVMC15NYrmXO_gETcM5asq6WKtAs/edit?usp=sharing)
