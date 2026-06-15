@@ -1,40 +1,35 @@
-# Amparo 
+# ☀️ Amparo
 
-## 😮‍💨 Buscando auxiliar no bem-estar psicológico dos adolescentes.
+![GitHub Licença](https://img.shields.io/badge/Licença-MIT-success.svg?style=flat-square&color=76ce3b)
+![SDK](https://img.shields.io/badge/SDK-56.0.8-4630EB?style=flat&logo=expo&logoColor=white&labelColor=000000)
+![NPM](https://img.shields.io/badge/NPM-11.6.2-brightgreen?style=flat&logo=npm&logoColor=white)
+
+## 🌱 Buscando auxiliar no bem-estar psicológico dos adolescentes.
 
 O aumento do uso excessivo de tecnologia e redes sociais contribui para o crescimento de ansiedade e depressão entre jovens. Soluções digitais podem fornecer intervenção precoce e suporte contínuo, impactando positivamente na qualidade de vida dos usuários.  
 
-
 ## 🛠️ Tecnologias Utilizadas
 
-| **Categoria**      | **Tecnologia**                            |
-| :----------------- | :---------------------------------------- |
-| **Backend**        | Node.js (JavaScript)                      |
-| **Mobile**         | Typescript / React Native (Expo)          |
-| **Banco de Dados** | Firebase (Firestore ou Realtime Database) |
+A stack foi escolhida para garantir facilidade no desenvolvimento multiplataforma com o Expo e simplicidade na gestão de dados em tempo real com o Firebase.
 
-## Equipe do Projeto
-
-O desenvolvimento do projeto foi realizado pela seguinte equipe:
-
-| **Função**         | **Integrantes**                 |
-| :----------------- | :------------------------------ |
-| **Backend**        | Vitor Oliveira                  | 
-| **Mobile**         | Sophia Prado & Carlos Gomes     |
-| **Banco de Dados** | Emerson Barbosa & Pedro Geballi |
+| **Categoria**      | **Tecnologia** |
+| :----------------- | :------------- |
+| **Backend**        | ![Node.js](https://img.shields.io/badge/Node.js-43853d?style=for-the-badge&logo=node.js&logoColor=white) |
+| **Mobile**         | ![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=for-the-badge&logo=typescript&logoColor=white) ![React Native](https://img.shields.io/badge/React%20Native-61dafb?style=for-the-badge&logo=react&logoColor=black) ![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white) |
+| **Banco de Dados** | ![Firebase](https://img.shields.io/badge/Firebase-ffca28?style=for-the-badge&logo=firebase&logoColor=black) |
 
 ## ❓ Como Executar o Projeto
 
-<aside>
-⚠️ <b>Aviso:</b> O projeto encontra-se em desenvolvimento ativo. Siga o passo a passo para testar a interface e os componentes atuais em um ambiente local.
-</aside>
+> [!WARNING]
+> O projeto se encontra em desenvolvimento ativo. Siga o passo a passo para testar a interface atual em um ambiente local.
 
 ### 📋 Pré-requisitos
 
-* Node.js (incluindo o gerenciador **NPM**)
-* Expo Go (aplicativo para Android e IOS)
+* [Node.js](https://nodejs.org/en/download/) - inclui o gerenciador **NPM**
+* [Expo Go para Android](https://play.google.com/store/apps/details?id=host.exp.exponent)
+* [Expo Go para iOS](https://apps.apple.com/us/app/expo-go/id982107779)
 
-> **Nota:** É possível executar de forma nativa no próprio navegador.
+> **Nota:** É possivel escolher rodar no navegador, não sendo necessário instalar o Expo Go.
 
 ---
 
@@ -80,9 +75,27 @@ http://localhost:8081
 
 > **Nota:** Se estiver utilizando o Expo Go: Um QR Code será exibido no terminal, abra o aplicativo Expo Go no seu celular e escaneie o código para visualizar o app.
 
+## 👥 Equipe do Projeto
+
+O desenvolvimento do projeto foi realizado pela seguinte equipe:
+
+| **Função**         | **Integrantes**                 |
+| :----------------- | :------------------------------ |
+| **Backend**        | Vitor Oliveira                  | 
+| **Mobile**         | Sophia Prado & Carlos Gomes     |
+| **Banco de Dados** | Emerson Barbosa & Pedro Geballi |
+
 ## ✅ Conceito de pronto
 
-- O código foi revisado por pelo menos outro desenvolvedor.
-- O testador não encontrou nenhum bug crítico.
+Uma funcionalidade nova será considerada concluída apenas quando atender os seguintes critérios:
+
+- O código foi testado e aprovado por pelo menos um outro desenvolvedor.
+- O testador não identificou nenhum bug crítico.
 - Toda a documentação do sistema foi atualizada.
 - O código foi integrado ao repositório principal do projeto.
+
+## 📚 Documentação
+
+Para mais detalhes sobre a documentação, especificações técnicas e pesquisas realizadas:
+ 
+- [Documentação](./documentacao)  
