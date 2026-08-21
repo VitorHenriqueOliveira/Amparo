@@ -9,7 +9,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown, FadeOutUp } from 'react-native-reanimated';
+import Animated, {
+  FadeInDown,
+  FadeOutUp,
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from 'react-native-reanimated';
 
 import FactorChip from '../components/FactorChip';
 import TimeField from '../components/TimeField';
@@ -65,6 +71,16 @@ export default function SleepScreen({ onGoBack, onOpenProfile }: SleepScreenProp
   const progressRatio = durationMinutes
     ? Math.min(durationMinutes / progressScaleMinutes, 1)
     : 0;
+
+  // Anima o preenchimento da barra suavemente sempre que a proporção mudar,
+  // em vez de "pular" direto para o novo valor.
+  const progressWidth = useSharedValue(0);
+  useEffect(() => {
+    progressWidth.value = withTiming(progressRatio * 100, { duration: 450 });
+  }, [progressRatio]);
+  const progressAnimatedStyle = useAnimatedStyle(() => ({
+    width: `${progressWidth.value}%`,
+  }));
 
   function handleSaveEntry() {
     if (durationMinutes === null) return;
@@ -133,7 +149,7 @@ export default function SleepScreen({ onGoBack, onOpenProfile }: SleepScreenProp
         showsVerticalScrollIndicator={false}
       >
         {/* Card principal: duração e status */}
-        <View style={styles.mainCard}>
+        <Animated.View entering={FadeInDown.duration(400).delay(60)} style={styles.mainCard}>
           <View style={styles.moonCircle}>
             <Ionicons name="moon" size={44} color={colors.white} />
           </View>
@@ -154,10 +170,10 @@ export default function SleepScreen({ onGoBack, onOpenProfile }: SleepScreenProp
               </Text>
             </View>
           ) : null}
-        </View>
+        </Animated.View>
 
         {/* Meta de sono */}
-        <View style={styles.card}>
+        <Animated.View entering={FadeInDown.duration(400).delay(140)} style={styles.card}>
           <Text style={styles.cardTitle}>Sua meta</Text>
           <Text style={styles.cardSubtitle}>Meta {selectedGoal.label} de sono</Text>
 
@@ -173,22 +189,22 @@ export default function SleepScreen({ onGoBack, onOpenProfile }: SleepScreenProp
           </View>
 
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progressRatio * 100}%` }]} />
+            <Animated.View style={[styles.progressFill, progressAnimatedStyle]} />
           </View>
           <View style={styles.progressLabels}>
             <Text style={styles.progressLabelText}>0h</Text>
             <Text style={styles.progressLabelText}>{selectedGoal.maxHours + 2}h</Text>
           </View>
-        </View>
+        </Animated.View>
 
         {/* Horários */}
-        <View style={styles.card}>
+        <Animated.View entering={FadeInDown.duration(400).delay(220)} style={styles.card}>
           <View style={styles.timeRow}>
             <TimeField icon="moon-outline" label="Hora de dormir" value={bedTime} onChange={setBedTime} />
             <View style={styles.timeDivider} />
             <TimeField icon="sunny-outline" label="Hora de acordar" value={wakeTime} onChange={setWakeTime} />
           </View>
-        </View>
+        </Animated.View>
 
         {/* Botão de salvar */}
         <View style={styles.saveButtonWrapper}>
