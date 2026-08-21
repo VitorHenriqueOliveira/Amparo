@@ -10,13 +10,13 @@ O aumento do uso excessivo de tecnologia e redes sociais contribui para o cresci
 
 ## 🛠️ Tecnologias Utilizadas
 
-A stack foi escolhida para garantir facilidade no desenvolvimento multiplataforma com o Expo e simplicidade na gestão de dados em tempo real com o Firebase.
+A stack foi escolhida para garantir facilidade no desenvolvimento multiplataforma com o Expo e alta performance no gerenciamento de dados relacionais com o Neon DB (PostgreSQL).
 
 | **Categoria**      | **Tecnologia** |
 | :----------------- | :------------- |
-| **Backend**        | ![Node.js](https://img.shields.io/badge/Node.js-43853d?style=for-the-badge&logo=node.js&logoColor=white) |
-| **Mobile**         | ![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=for-the-badge&logo=typescript&logoColor=white) ![React Native](https://img.shields.io/badge/React%20Native-61dafb?style=for-the-badge&logo=react&logoColor=black) ![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white) |
-| **Banco de Dados** | ![Firebase](https://img.shields.io/badge/Firebase-ffca28?style=for-the-badge&logo=firebase&logoColor=black) |
+| **Backend**        | ![Node.js](https://img.shields.io/badge/Node.js-43853d?style=for-the-badge&logo=node.js&logoColor=white)   |
+| **Mobile**         | ![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=for-the-badge&logo=typescript&logoColor=white) ![React Native](https://img.shields.io/badge/React%20Native-61dafb?style=for-the-badge&logo=react&logoColor=black) ![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)      |
+| **Banco de Dados** | ![Neon](https://img.shields.io/badge/Neon-00E599?style=for-the-badge&logo=neon&logoColor=black) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white) |
 
 ## ❓ Como Executar o Projeto
 
