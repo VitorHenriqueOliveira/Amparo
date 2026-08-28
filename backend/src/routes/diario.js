@@ -1,11 +1,21 @@
 import express from 'express';
 import sql from '../db.js';
+import verificarToken from '../middlewares/auth.js';
 
 const router = express.Router();
+
+// Garantir que todas as rotas exigam o token
+router.use(verificarToken);
 
 // 1. Buscar notas (GET)
 router.get('/diario/:id_usuario', async (req, res) => {
     const { id_usuario } = req.params;
+
+    // Verifica se o usuário que está pedindo as notas é o mesmo do token acima
+    if (parseInt(id_usuario) !== req.id_usuario_logado) {
+        return res.status(403).json({ erro: 'Você nmão tem permissão para ver as notas de outro usuário.' });
+    }
+
     try {
         const notas = await sql`SELECT id_diario, descricao, data_registro FROM diario WHERE id_usuario = ${id_usuario} ORDER BY data_registro DESC`;
         res.json(notas);
@@ -25,7 +35,7 @@ router.post('/diario', async (req, res) => {
     }
 });
 
-// 3. EDITAR NOTA (PUT) - ADICIONADO AGORA
+// 3. Editar nota (PUT)
 router.put('/diario/:id_diario', async (req, res) => {
     const { id_diario } = req.params;
     const { descricao } = req.body;
@@ -42,7 +52,7 @@ router.put('/diario/:id_diario', async (req, res) => {
     }
 });
 
-// 4. EXCLUIR NOTA (DELETE)
+// 4. Excluir nota (DELETE)
 router.delete('/diario/:id_diario', async (req, res) => {
     const { id_diario } = req.params;
     try {

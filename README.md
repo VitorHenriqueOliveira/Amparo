@@ -60,6 +60,14 @@ PowerShell / CMD / GitBash:
 cd backend
 ```
 
+#### Instalar as dependências:
+
+PowerShell / CMD / GitBash:
+
+```bash
+npm install
+```
+
 #### Rodar o servidor
 
 PowerShell / CMD / GitBash:

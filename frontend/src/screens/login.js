@@ -6,7 +6,8 @@ import {
     TouchableOpacity,
     StyleSheet,
     SafeAreaView,
-    Alert
+    Alert,
+    ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,8 @@ import { AuthContext } from '../contexts/AuthContext';
 export default function LoginScreen({ navigation }) {
     const [email, setEmail] = useState('');
     const [senha, setSenha] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
     const { login } = useContext(AuthContext);
 
     // Função que conversa com o Backend
@@ -26,6 +29,8 @@ export default function LoginScreen({ navigation }) {
             return;
         }
 
+        setIsLoading(true);
+
         try {
             // Dispara a requisição para a rota
             const response = await api.post('/login', {
@@ -34,11 +39,14 @@ export default function LoginScreen({ navigation }) {
             });
 
             // Salvando os dados no contexto e no AsyncStorage
-            const dadosUsuario = response.data;
-            await login(dadosUsuario);
+            const { usuario, token } = response.data;
+
+            // Passa o usuário e o token para a função de contexto
+            await login(usuario, token);
 
         } catch (error) {
-            // Se deu erro (Status 401), avisa o usuário
+            // Se deu erro (Status 401), avisa o usuário e para de carregar para tentar novamente.
+            setIsLoading(false);
             Alert.alert('Erro de Acesso', 'E-mail ou senha incorretos. Tente novamente.');
             console.log('Falha no login:', error);
         }
@@ -68,6 +76,7 @@ export default function LoginScreen({ navigation }) {
                             onChangeText={setEmail}
                             keyboardType="email-address"
                             autoCapitalize="none"
+                            editable={!isLoading}
                         />
 
                         <TextInput
@@ -77,18 +86,24 @@ export default function LoginScreen({ navigation }) {
                             secureTextEntry
                             value={senha}
                             onChangeText={setSenha}
+                            editable={!isLoading}
                         />
 
-                        <TouchableOpacity style={styles.forgotButton}>
+                        <TouchableOpacity style={styles.forgotButton} disabled={isLoading}>
                             <Text style={styles.forgotText}>Esqueceu a senha?</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={styles.loginButton}
+                            style={[styles.loginButton, isLoading && { opacity: 0.7 }]}
                             onPress={handleLogin}
+                            disabled={isLoading}
                         >
-                            <Text style={styles.loginButtonText}>Entrar</Text>
-                        </TouchableOpacity>
+                            {isLoading ? (
+                                <ActivityIndicator size="small" color="#FFF" />
+                            ) : (
+                                <Text style={styles.loginButtonText}>Entrar</Text>
+                            )}
+                        </TouchableOpacity >
                     </View>
                 </View>
             </SafeAreaView>
