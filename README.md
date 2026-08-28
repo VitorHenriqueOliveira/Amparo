@@ -25,11 +25,12 @@ A stack foi escolhida para garantir facilidade no desenvolvimento multiplataform
 
 ### 📋 Pré-requisitos
 
-* [Node.js](https://nodejs.org/en/download/) - inclui o gerenciador **NPM**
+* [Git](https://git-scm.com/install/windows) - sistema de controle de versão
+* [Node.js](https://nodejs.org/pt-br/download) - inclui o gerenciador **NPM**
 * [Expo Go para Android](https://play.google.com/store/apps/details?id=host.exp.exponent)
 * [Expo Go para iOS](https://apps.apple.com/us/app/expo-go/id982107779)
 
-> **Nota:** É possivel escolher rodar no navegador, não sendo necessário instalar o Expo Go.
+> **Nota:** É possível escolher rodar no navegador, não sendo necessário instalar o Expo Go.
 
 ---
 
