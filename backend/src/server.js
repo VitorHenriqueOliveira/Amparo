@@ -9,8 +9,11 @@ app.use(cors());
 app.use(express.json());
 
 // Ligando as rotas
-app.use('/api', rotasDiario); 
+
+// Rotas públicas
 app.use('/api', rotasUsuario);
+// Rotas protegidas
+app.use('/api', rotasDiario); 
 
 app.listen(3000, () => {
     console.log('Backend rodando na porta 3000!');
