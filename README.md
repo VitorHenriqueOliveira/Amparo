@@ -51,6 +51,30 @@ PowerShell / CMD / GitBash:
 cd Amparo
 ```
 
+#### Entrar na pasta de backend
+
+PowerShell / CMD / GitBash:
+
+```bash
+cd backend
+```
+
+#### Rodar o servidor
+
+PowerShell / CMD / GitBash:
+
+```bash
+node src/server.js
+```
+
+#### Entrar na pasta de frontend
+
+PowerShell / CMD / GitBash:
+
+```bash
+cd frontend
+```
+
 #### Instalar as dependências:
 
 PowerShell / CMD / GitBash:
