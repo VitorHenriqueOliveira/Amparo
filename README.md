@@ -1,7 +1,7 @@
 # ☀️ Amparo
 
 ![GitHub Licença](https://img.shields.io/badge/Licença-MIT-success.svg?style=flat-square&color=76ce3b)
-![SDK](https://img.shields.io/badge/SDK-56.0.8-4630EB?style=flat&logo=expo&logoColor=white&labelColor=000000)
+![SDK](https://img.shields.io/badge/SDK-57.0.14-4630EB?style=flat&logo=expo&logoColor=white&labelColor=000000)
 ![NPM](https://img.shields.io/badge/NPM-11.6.2-brightgreen?style=flat&logo=npm&logoColor=white)
 
 ## 🌱 Buscando auxiliar no bem-estar psicológico dos adolescentes.
