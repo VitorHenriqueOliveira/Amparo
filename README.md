@@ -1,7 +1,7 @@
 # ☀️ Amparo
 
 ![GitHub Licença](https://img.shields.io/badge/Licença-MIT-success.svg?style=flat-square&color=76ce3b)
-![SDK](https://img.shields.io/badge/SDK-56.0.8-4630EB?style=flat&logo=expo&logoColor=white&labelColor=000000)
+![SDK](https://img.shields.io/badge/SDK-57.0.14-4630EB?style=flat&logo=expo&logoColor=white&labelColor=000000)
 ![NPM](https://img.shields.io/badge/NPM-11.6.2-brightgreen?style=flat&logo=npm&logoColor=white)
 
 ## 🌱 Buscando auxiliar no bem-estar psicológico dos adolescentes.
@@ -15,7 +15,7 @@ A stack foi escolhida para garantir facilidade no desenvolvimento multiplataform
 | **Categoria**      | **Tecnologia** |
 | :----------------- | :------------- |
 | **Backend**        | ![Node.js](https://img.shields.io/badge/Node.js-43853d?style=for-the-badge&logo=node.js&logoColor=white)   |
-| **Mobile**         | ![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=for-the-badge&logo=typescript&logoColor=white) ![React Native](https://img.shields.io/badge/React%20Native-61dafb?style=for-the-badge&logo=react&logoColor=black) ![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)      |
+| **Mobile**         | ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black) ![React Native](https://img.shields.io/badge/React%20Native-61dafb?style=for-the-badge&logo=react&logoColor=black) ![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)      |
 | **Banco de Dados** | ![Neon](https://img.shields.io/badge/Neon-00E599?style=for-the-badge&logo=neon&logoColor=black) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white) |
 
 ## ❓ Como Executar o Projeto
@@ -25,11 +25,12 @@ A stack foi escolhida para garantir facilidade no desenvolvimento multiplataform
 
 ### 📋 Pré-requisitos
 
-* [Node.js](https://nodejs.org/en/download/) - inclui o gerenciador **NPM**
+* [Git](https://git-scm.com/install/windows) - sistema de controle de versão
+* [Node.js](https://nodejs.org/pt-br/download) - inclui o gerenciador **NPM**
 * [Expo Go para Android](https://play.google.com/store/apps/details?id=host.exp.exponent)
 * [Expo Go para iOS](https://apps.apple.com/us/app/expo-go/id982107779)
 
-> **Nota:** É possivel escolher rodar no navegador, não sendo necessário instalar o Expo Go.
+> **Nota:** É possível escolher rodar no navegador, não sendo necessário instalar o Expo Go.
 
 ---
 
@@ -49,6 +50,38 @@ PowerShell / CMD / GitBash:
 
 ```bash
 cd Amparo
+```
+
+#### Entrar na pasta de backend
+
+PowerShell / CMD / GitBash:
+
+```bash
+cd backend
+```
+
+#### Instalar as dependências:
+
+PowerShell / CMD / GitBash:
+
+```bash
+npm install
+```
+
+#### Rodar o servidor
+
+PowerShell / CMD / GitBash:
+
+```bash
+node src/server.js
+```
+
+#### Entrar na pasta de frontend
+
+PowerShell / CMD / GitBash:
+
+```bash
+cd frontend
 ```
 
 #### Instalar as dependências:
@@ -101,3 +134,4 @@ Para mais detalhes sobre a documentação, especificações técnicas e pesquisa
 - [Documentação](https://docs.google.com/document/d/1nOHPZHFb7zF-VEaVPTtvxNx0Jwl455FKO8_sslU9eu4/edit?usp=sharing)
 - [Especificação de Casos de Uso](https://docs.google.com/document/d/1Ck6EZCFioj6pZ4LhuvUBVGhGwfjaz90cURt_v9vB9Ec/edit?usp=sharing)
 - [Especificações Técnicas](https://docs.google.com/document/d/1xHQsBjWIKVvXDSzJVMC15NYrmXO_gETcM5asq6WKtAs/edit?usp=sharing)
+- [Diagrama de Arquitetura](https://docs.google.com/document/d/1zlUJwYatcSVM3Y5DdBzmsBXZAXW-wv2cJCZjdj8yTuk/edit?usp=sharing)

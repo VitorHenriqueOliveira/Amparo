@@ -1,20 +1,51 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   Animated,
   Easing,
+  Alert,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import api from '../services/api';
+import { AuthContext } from '../contexts/AuthContext';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { login } = useContext(AuthContext);
+
+  function mostrarErro(mensagem) {
+    if (Platform.OS === 'web') window.alert(mensagem);
+    else Alert.alert('Acesso', mensagem);
+  }
+
+  async function handleLogin() {
+    if (isLoading) return;
+    if (!email.trim() || !senha.trim()) {
+      mostrarErro('Por favor, preencha seu e-mail e senha.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { data } = await api.post('/login', { email: email.trim().toLowerCase(), senha });
+      await login(data.usuario, data.token);
+    } catch (error) {
+      mostrarErro(error.response?.status === 401
+        ? 'E-mail ou senha incorretos. Tente novamente.'
+        : 'Não foi possível entrar. Verifique sua conexão e tente novamente.');
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   // Animações iguais às da Home
   const sunScale = useRef(new Animated.Value(1)).current;
@@ -140,6 +171,7 @@ export default function LoginScreen({ navigation }) {
                   onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  editable={!isLoading}
                 />
               </View>
 
@@ -159,6 +191,7 @@ export default function LoginScreen({ navigation }) {
                   secureTextEntry
                   value={senha}
                   onChangeText={setSenha}
+                  editable={!isLoading}
                 />
               </View>
 
@@ -174,13 +207,14 @@ export default function LoginScreen({ navigation }) {
 
               {/* BOTÃO ENTRAR */}
               <TouchableOpacity
-                style={styles.loginButton}
-                onPress={() => navigation.navigate('Intro')}
+                style={[styles.loginButton, isLoading && { opacity: 0.7 }]}
+                onPress={handleLogin}
+                disabled={isLoading}
                 activeOpacity={0.8}
               >
-                <Text style={styles.loginButtonText}>
-                  Entrar
-                </Text>
+                {isLoading ? <ActivityIndicator color="#274804" /> : (
+                  <Text style={styles.loginButtonText}>Entrar</Text>
+                )}
 
                 <Ionicons
                   name="arrow-forward"

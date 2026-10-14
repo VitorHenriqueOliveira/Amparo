@@ -5,13 +5,14 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   Animated,
   Easing,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
 
 const PHASES = [
   {
@@ -50,6 +51,7 @@ const BOTTOM_NAV_ICONS = [
 ];
 
 export default function ModoCalmaScreen({ navigation }) {
+  const isFocused = useIsFocused();
   const [phaseIndex, setPhaseIndex] = useState(0);
   const [seconds, setSeconds] = useState(PHASES[0].duration);
   const [paused, setPaused] = useState(false);
@@ -62,7 +64,7 @@ export default function ModoCalmaScreen({ navigation }) {
 
   // Contador: cada fase respeita sua própria duração.
 useEffect(() => {
-  if (paused) return;
+  if (paused || !isFocused) return;
 
   const interval = setInterval(() => {
     setSeconds((currentSeconds) => {
@@ -80,24 +82,26 @@ useEffect(() => {
   }, 1000);
 
   return () => clearInterval(interval);
-}, [paused, phaseIndex]);
+}, [paused, phaseIndex, isFocused]);
 
   // Animação sincronizada com a fase atual.
   useEffect(() => {
     breathingScale.stopAnimation();
 
-    if (paused) return;
+    if (paused || !isFocused) return;
 
     const targetScale = currentPhase.scale;
     const duration = currentPhase.duration * 1000;
 
-    Animated.timing(breathingScale, {
+    const animation = Animated.timing(breathingScale, {
       toValue: targetScale,
       duration,
       easing: Easing.inOut(Easing.ease),
       useNativeDriver: true,
-    }).start();
-  }, [phaseIndex, paused]);
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [phaseIndex, paused, isFocused, breathingScale, currentPhase]);
 
   const togglePause = () => {
     setPaused((currentValue) => !currentValue);

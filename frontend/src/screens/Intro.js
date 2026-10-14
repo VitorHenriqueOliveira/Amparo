@@ -5,8 +5,8 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,7 +36,7 @@ export default function IntroScreen({ navigation }) {
     if (currentIndex < SLIDES.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
-      navigation.navigate('MainTabs');
+      navigation.replace('MainTabs');
     }
   };
 

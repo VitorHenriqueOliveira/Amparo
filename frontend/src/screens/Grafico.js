@@ -1,13 +1,13 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useContext } from 'react';
 
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,9 +16,10 @@ import Svg, { Path, Circle } from 'react-native-svg';
 
 import {
   listarEmocoes,
-  listarDiario,
   listarSono,
 } from '../storage/registros';
+import { listarDiario } from '../services/diario';
+import { AuthContext } from '../contexts/AuthContext';
 
 const EMOCOES = {
   feliz: {
@@ -95,7 +96,7 @@ function lerData(valor) {
 
   if (typeof valor !== 'string') return null;
 
-  const dataISO = valor.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const dataISO = valor.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 
   if (dataISO) {
     return new Date(
@@ -399,6 +400,8 @@ function gerarConselho(contagens, total, mediaSono) {
 }
 
 export default function GraficoScreen({ navigation }) {
+  const { usuario } = useContext(AuthContext);
+  const idUsuario = usuario.id_usuario;
   const [dados, setDados] = useState({
     emocoes: [],
     diario: [],
@@ -419,9 +422,9 @@ export default function GraficoScreen({ navigation }) {
 
         try {
           const [emocoes, diario, sono] = await Promise.all([
-            listarEmocoes(),
-            listarDiario(),
-            listarSono(),
+            listarEmocoes(idUsuario),
+            listarDiario(idUsuario),
+            listarSono(idUsuario),
           ]);
 
           if (mounted) {
@@ -432,7 +435,7 @@ export default function GraficoScreen({ navigation }) {
             });
           }
         } catch (error) {
-          console.error('Erro ao carregar gráfico:', error);
+          console.error('Erro ao carregar gráfico.');
           if (mounted) setErro(true);
         } finally {
           if (mounted) setCarregando(false);
@@ -444,7 +447,7 @@ export default function GraficoScreen({ navigation }) {
       return () => {
         mounted = false;
       };
-    }, [])
+    }, [idUsuario])
   );
 
   const hoje = new Date();

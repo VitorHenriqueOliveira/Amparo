@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   ScrollView,
   TouchableOpacity,
@@ -14,8 +13,10 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { AuthContext } from '../contexts/AuthContext';
 
 const NAV_ITEMS = [
   { name: 'book-outline', route: 'Diario', label: 'Diário' },
@@ -26,8 +27,9 @@ const NAV_ITEMS = [
 ];
 
 export default function Perfil({ navigation }) {
-  const [nome, setNome] = useState('Seu Nome');
-  const [nomeEditado, setNomeEditado] = useState('Seu Nome');
+  const { usuario, logout, atualizarNome } = useContext(AuthContext);
+  const nome = usuario.nome || 'Seu Nome';
+  const [nomeEditado, setNomeEditado] = useState(nome);
   const [notificacoes, setNotificacoes] = useState(true);
   const [modalVisivel, setModalVisivel] = useState(false);
 
@@ -36,7 +38,7 @@ export default function Perfil({ navigation }) {
     setModalVisivel(true);
   }
 
-  function salvarNome() {
+  async function salvarNome() {
     const nomeFinal = nomeEditado.trim();
 
     if (!nomeFinal) {
@@ -44,24 +46,30 @@ export default function Perfil({ navigation }) {
       return;
     }
 
-    setNome(nomeFinal);
-    setModalVisivel(false);
+    try {
+      await atualizarNome(nomeFinal);
+      setModalVisivel(false);
+    } catch {
+      Alert.alert('Erro', 'Não foi possível salvar o nome. Tente novamente.');
+    }
   }
 
   function sairDaConta() {
-    Alert.alert('Sair da conta', 'Tem certeza de que deseja sair?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Sair',
-        style: 'destructive',
-        onPress: () => {
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
-          });
-        },
-      },
-    ]);
+    const confirmarSaida = async () => {
+      try { await logout(); }
+      catch {
+        if (Platform.OS === 'web') window.alert('Não foi possível sair. Tente novamente.');
+        else Alert.alert('Erro', 'Não foi possível sair. Tente novamente.');
+      }
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm('Tem certeza de que deseja sair da conta?')) confirmarSaida();
+    } else {
+      Alert.alert('Sair da conta', 'Tem certeza de que deseja sair?', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Sair', style: 'destructive', onPress: confirmarSaida },
+      ]);
+    }
   }
 
   function voltar() {

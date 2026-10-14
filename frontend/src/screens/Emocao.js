@@ -1,20 +1,21 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useContext } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   Alert,
   Platform,
   ScrollView,
   Animated,
   Easing,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { adicionarEmocao } from '../storage/registros';
+import { AuthContext } from '../contexts/AuthContext';
 
 const BOTTOM_NAV_ITEMS = [
   { icon: 'book-outline', route: 'Diario', label: 'Diário Emocional' },
@@ -60,6 +61,7 @@ const EMOTIONS = {
 };
 
 export default function EmocaoScreen({ navigation }) {
+  const { usuario } = useContext(AuthContext);
   const [selectedEmotionKey, setSelectedEmotionKey] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -99,6 +101,7 @@ export default function EmocaoScreen({ navigation }) {
 
     try {
       await adicionarEmocao(
+        usuario.id_usuario,
         selectedEmotion.id,
         selectedEmotion.title
       );

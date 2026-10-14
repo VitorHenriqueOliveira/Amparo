@@ -41,3 +41,11 @@ example
 # generated native folders
 /ios
 /android
+
+# Frontend: configuração local da API
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# Documentação e preferências locais dos agentes
+/Agents/

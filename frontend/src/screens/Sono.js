@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   Modal,
   TextInput,
   ScrollView,
@@ -12,12 +11,12 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { listarSono, registrarSonoHoje } from '../storage/registros';
+import { AuthContext } from '../contexts/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-
-const STORAGE_KEY = '@amparo:registros_sono';
 
 const DEFAULT_SLEEP_TIME = '22:30';
 const DEFAULT_WAKE_TIME = '06:30';
@@ -50,15 +49,6 @@ const BOTTOM_NAV_ITEMS = [
     label: 'Modo Calma Urgente',
   },
 ];
-
-function getToday() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-
-  return `${year}-${month}-${day}`;
-}
 
 function isValidTime(time) {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
@@ -121,19 +111,9 @@ function getStatusInfo(totalMinutes) {
   };
 }
 
-async function readSleepHistory() {
-  const storedData = await AsyncStorage.getItem(STORAGE_KEY);
-
-  if (!storedData) {
-    return [];
-  }
-
-  const parsedData = JSON.parse(storedData);
-
-  return Array.isArray(parsedData) ? parsedData : [];
-}
-
 export default function SonoScreen({ navigation }) {
+  const { usuario } = useContext(AuthContext);
+  const idUsuario = usuario.id_usuario;
   const [sleepTime, setSleepTime] = useState(DEFAULT_SLEEP_TIME);
   const [wakeTime, setWakeTime] = useState(DEFAULT_WAKE_TIME);
 
@@ -159,7 +139,7 @@ export default function SonoScreen({ navigation }) {
 
     async function loadSleepData() {
       try {
-        const history = await readSleepHistory();
+        const history = await listarSono(idUsuario);
 
         if (!mounted || history.length === 0) {
           return;
@@ -192,7 +172,7 @@ export default function SonoScreen({ navigation }) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [idUsuario]);
 
   const showMessage = (title, message) => {
     if (Platform.OS === 'web') {
@@ -206,35 +186,6 @@ export default function SonoScreen({ navigation }) {
     setEditType(type);
     setTempTime(type === 'sleep' ? sleepTime : wakeTime);
     setModalVisible(true);
-  };
-
-  const saveSleepRecord = async (newSleepTime, newWakeTime) => {
-    const history = await readSleepHistory();
-    const today = getToday();
-
-    const durationMinutes = calculateDuration(
-      newSleepTime,
-      newWakeTime
-    );
-
-    const todayRecord = {
-      id: today,
-      date: today,
-      sleepTime: newSleepTime,
-      wakeTime: newWakeTime,
-      durationMinutes,
-      updatedAt: new Date().toISOString(),
-    };
-
-    const updatedHistory = [
-      ...history.filter((record) => record.date !== today),
-      todayRecord,
-    ].sort((a, b) => a.date.localeCompare(b.date));
-
-    await AsyncStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(updatedHistory)
-    );
   };
 
   const handleSaveTime = async () => {
@@ -261,7 +212,7 @@ export default function SonoScreen({ navigation }) {
     setSaving(true);
 
     try {
-      await saveSleepRecord(newSleepTime, newWakeTime);
+      await registrarSonoHoje(idUsuario, newSleepTime, newWakeTime);
 
       setSleepTime(newSleepTime);
       setWakeTime(newWakeTime);

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "AmparoApp",
-    "slug": "AmparoApp",
+    "name": "Amparo",
+    "slug": "Amparo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "amparoapp",
+    "scheme": "amparo",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
@@ -20,7 +20,6 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-    
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -31,7 +30,9 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-image",
+      "expo-web-browser"
     ],
     "experiments": {
       "reactCompiler": true

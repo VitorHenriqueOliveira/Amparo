@@ -1,46 +1,55 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState, useContext } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { listarDiario, salvarDiario } from '../storage/registros';
+import { listarDiario, criarNota, atualizarNota, excluirNota } from '../services/diario';
+import { AuthContext } from '../contexts/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
+
+function mostrarMensagem(titulo, mensagem) {
+  if (Platform.OS === 'web') window.alert(titulo + '\n\n' + mensagem);
+  else Alert.alert(titulo, mensagem);
+}
 
 export default function DiarioScreen({ navigation }) {
+  const { usuario } = useContext(AuthContext);
+  const idUsuario = usuario.id_usuario;
   const [notes, setNotes] = useState([]);
   const [text, setText] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [isWriting, setIsWriting] = useState(false);
   const [notesLoaded, setNotesLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let mounted = true;
 
     async function carregarNotas() {
+      setNotesLoaded(false);
+      setLoadError(false);
       try {
-        const notasSalvas = await listarDiario();
+        const notasSalvas = await listarDiario(idUsuario);
 
         if (mounted) {
           setNotes(Array.isArray(notasSalvas) ? notasSalvas : []);
         }
       } catch (error) {
-        console.error('Erro ao carregar diário:', error);
+        console.error('Erro ao carregar diário.');
 
         if (mounted) {
-          Alert.alert(
-            'Erro',
-            'Não foi possível carregar seus registros.'
-          );
+          setLoadError(true);
         }
       } finally {
         if (mounted) {
@@ -54,59 +63,33 @@ export default function DiarioScreen({ navigation }) {
     return () => {
       mounted = false;
     };
-  }, []);
-
-  const getFormattedDate = () => {
-    const today = new Date();
-    const day = String(today.getDate()).padStart(2, '0');
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const year = today.getFullYear();
-
-    return `${day}/${month}/${year}`;
-  };
-
-  const persistirNotas = async (notasAtualizadas) => {
-    await salvarDiario(notasAtualizadas);
-    setNotes(notasAtualizadas);
-  };
+  }, [idUsuario]));
 
   const handleSave = async () => {
     if (!notesLoaded || saving) return;
 
     if (!text.trim()) {
-      Alert.alert('Atenção', 'Escreva algo antes de salvar.');
+      mostrarMensagem('Atenção', 'Escreva algo antes de salvar.');
       return;
     }
 
     setSaving(true);
 
     try {
-      let notasAtualizadas;
-
       if (editingId !== null) {
-        notasAtualizadas = notes.map((note) =>
-          note.id === editingId
-            ? { ...note, text: text.trim() }
-            : note
-        );
+        const nota = await atualizarNota(editingId, text.trim());
+        setNotes((atuais) => atuais.map((item) => item.id === nota.id ? nota : item));
       } else {
-        const newNote = {
-          id: Date.now().toString(),
-          text: text.trim(),
-          date: getFormattedDate(),
-        };
-
-        notasAtualizadas = [newNote, ...notes];
+        const nota = await criarNota(idUsuario, text.trim());
+        setNotes((atuais) => [nota, ...atuais]);
       }
-
-      await persistirNotas(notasAtualizadas);
 
       setText('');
       setEditingId(null);
       setIsWriting(false);
     } catch (error) {
-      console.error('Erro ao salvar registro:', error);
-      Alert.alert(
+      console.error('Erro ao salvar registro.');
+      mostrarMensagem(
         'Erro ao salvar',
         'Não foi possível salvar seu registro. Tente novamente.'
       );
@@ -128,11 +111,8 @@ export default function DiarioScreen({ navigation }) {
       setSaving(true);
 
       try {
-        const notasAtualizadas = notes.filter(
-          (note) => note.id !== id
-        );
-
-        await persistirNotas(notasAtualizadas);
+        await excluirNota(id);
+        setNotes((atuais) => atuais.filter((note) => note.id !== id));
 
         if (editingId === id) {
           setEditingId(null);
@@ -140,8 +120,8 @@ export default function DiarioScreen({ navigation }) {
           setIsWriting(false);
         }
       } catch (error) {
-        console.error('Erro ao excluir registro:', error);
-        Alert.alert(
+        console.error('Erro ao excluir registro.');
+        mostrarMensagem(
           'Erro',
           'Não foi possível excluir o registro.'
         );
@@ -302,8 +282,9 @@ export default function DiarioScreen({ navigation }) {
                       color="rgba(255,255,255,0.3)"
                     />
                     <Text style={styles.emptyText}>
-                      Nenhum registro encontrado.{'\n'}
-                      Toque no botão abaixo para adicionar.
+                      {loadError
+                        ? 'Não foi possível carregar seus registros. Volte a esta tela para tentar novamente.'
+                        : 'Nenhum registro encontrado.\nToque no botão abaixo para adicionar.'}
                     </Text>
                   </View>
                 ) : (
