@@ -1,513 +1,789 @@
-import React, { useEffect, useRef, useState } from 'react';
-
+import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-  Easing,
+    View, Text, TouchableOpacity, StyleSheet, Animated, Easing,
+    AppState, AccessibilityInfo, ScrollView, Modal, FlatList, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import Svg, { Circle } from 'react-native-svg';
 import { useIsFocused } from '@react-navigation/native';
+import { AuthContext } from '../contexts/AuthContext';
+import { criarCicloRespiracao, FASES_RESPIRACAO } from '../services/respiracao';
+import { registrarCicloCalma, listarHistoricoLocalCalma, atualizarHistoricoCalma } from '../services/calma';
 
-const PHASES = [
-  {
-    name: 'Inspire',
-    duration: 4,
-    instruction: 'Inspire suavemente, sem forçar.',
-    scale: 1,
-  },
-  {
-    name: 'Segure',
-    duration: 2,
-    instruction: 'Se for confortável, mantenha o ar.',
-    scale: 1,
-  },
-  {
-    name: 'Expire',
-    duration: 6,
-    instruction: 'Solte o ar devagar, no seu ritmo.',
-    scale: 0.86,
-  },
-  {
-    name: 'Descanse',
-    duration: 2,
-    instruction: 'Relaxe antes do próximo ciclo.',
-    scale: 0.86,
-  },
-];
+// O atributo de layout do Animated não pertence aos elementos SVG na web.
+const CirculoProgresso = React.forwardRef((propriedades, referencia) => {
+    const atributos = { ...propriedades };
 
-// Mesma ordem e mesmos ícones das outras telas.
-const BOTTOM_NAV_ICONS = [
-  { name: 'book-outline', route: 'Diario' },
-  { name: 'happy-outline', route: 'Emocao' },
-  { name: 'moon-outline', route: 'Sono' },
-  { name: 'trending-up-outline', route: 'Grafico' },
-  { name: 'heart-outline', route: 'ModoCalma' },
+    delete atributos.collapsable;
+
+    return <Circle {...atributos} ref={referencia} />;
+});
+const CirculoAnimado = Animated.createAnimatedComponent(CirculoProgresso);
+const CIRCUNFERENCIA = 2 * Math.PI * 114;
+const NAVEGACAO = [
+    { icone: 'book-outline', rota: 'Diario', titulo: 'Diário' },
+    { icone: 'happy-outline', rota: 'Emocao', titulo: 'Registro emocional' },
+    { icone: 'moon-outline', rota: 'Sono', titulo: 'Sono' },
+    { icone: 'trending-up-outline', rota: 'Grafico', titulo: 'Evolução emocional' },
+    { icone: 'heart-outline', rota: 'ModoCalma', titulo: 'Modo Calma Urgente' },
 ];
 
 export default function ModoCalmaScreen({ navigation }) {
-  const isFocused = useIsFocused();
-  const [phaseIndex, setPhaseIndex] = useState(0);
-  const [seconds, setSeconds] = useState(PHASES[0].duration);
-  const [paused, setPaused] = useState(false);
-
-  const breathingScale = useRef(
-    new Animated.Value(0.86)
-  ).current;
-
-  const currentPhase = PHASES[phaseIndex];
-
-  // Contador: cada fase respeita sua própria duração.
-useEffect(() => {
-  if (paused || !isFocused) return;
-
-  const interval = setInterval(() => {
-    setSeconds((currentSeconds) => {
-      if (currentSeconds > 1) {
-        return currentSeconds - 1;
-      }
-
-      setPhaseIndex((currentIndex) => {
-        const nextIndex = (currentIndex + 1) % PHASES.length;
-        return nextIndex;
-      });
-
-      return PHASES[(phaseIndex + 1) % PHASES.length].duration;
+    const { usuario } = useContext(AuthContext);
+    const idUsuario = usuario?.id_usuario;
+    const focado = useIsFocused();
+    const contaAtual = useRef(idUsuario);
+    const montado = useRef(true);
+    const progresso = useRef(new Animated.Value(0)).current;
+    const identificadorTela = React.useId();
+    const versaoTelaAtiva = useRef(0);
+    const versaoConsulta = useRef(0);
+    const [pausado, setPausado] = useState(false);
+    const [appAtivo, setAppAtivo] = useState(!AppState.currentState || AppState.currentState === 'active');
+    const [reduzirMovimento, setReduzirMovimento] = useState(false);
+    const [historicoAberto, setHistoricoAberto] = useState(false);
+    const [historico, setHistorico] = useState({ registros: [], pendentes: 0 });
+    const [sincronizando, setSincronizando] = useState(false);
+    const [mensagemHistorico, setMensagemHistorico] = useState('');
+    const [estado, setEstado] = useState({
+        indiceFase: 0, restanteMs: 4000, segundos: 4, progresso: 0,
+        ciclosConcluidos: 0, emExecucao: false,
+        versaoFase: 0,
     });
-  }, 1000);
 
-  return () => clearInterval(interval);
-}, [paused, phaseIndex, isFocused]);
+    contaAtual.current = idUsuario;
 
-  // Animação sincronizada com a fase atual.
-  useEffect(() => {
-    breathingScale.stopAnimation();
+    function podeAtualizar(conta) {
+        return montado.current && contaAtual.current === conta;
+    }
 
-    if (paused || !isFocused) return;
+    async function carregarHistorico(conta) {
+        const consultaAtual = ++versaoConsulta.current;
+        const consultaVigente = () => podeAtualizar(conta) && versaoConsulta.current === consultaAtual;
 
-    const targetScale = currentPhase.scale;
-    const duration = currentPhase.duration * 1000;
+        try {
+            const local = await listarHistoricoLocalCalma(conta);
 
-    const animation = Animated.timing(breathingScale, {
-      toValue: targetScale,
-      duration,
-      easing: Easing.inOut(Easing.ease),
-      useNativeDriver: true,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [phaseIndex, paused, isFocused, breathingScale, currentPhase]);
+            if (consultaVigente()) {
+                setHistorico(local);
+                setSincronizando(true);
+            }
 
-  const togglePause = () => {
-    setPaused((currentValue) => !currentValue);
-  };
+            const atualizado = await atualizarHistoricoCalma(conta);
 
-  return (
-    <LinearGradient
-      colors={['#BBFF00', '#F0FCCE', '#72A600']}
-      style={styles.container}
-    >
-      <SafeAreaView style={styles.safeArea}>
-        <LinearGradient
-          colors={['#2A4705', '#162802']}
-          style={styles.headerBar}
-        >
-          <TouchableOpacity
-            style={styles.headerSide}
-            onPress={() => navigation?.goBack()}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name="chevron-back"
-              size={27}
-              color="#BBFF00"
-            />
-          </TouchableOpacity>
+            if (consultaVigente()) {
+                setHistorico(atualizado);
+                setMensagemHistorico('');
+            }
+        } catch {
+            // A indisponibilidade da API não interrompe a respiração guiada.
+            const local = await listarHistoricoLocalCalma(conta).catch(() => null);
 
-          <Text style={styles.headerTitle}>
-            Modo calma urgente
-          </Text>
-
-          <TouchableOpacity
-            style={styles.headerSide}
-            onPress={() => navigation?.navigate('Perfil')}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name="person-circle-outline"
-              size={31}
-              color="#BBFF00"
-            />
-          </TouchableOpacity>
-        </LinearGradient>
-
-        <View style={styles.content}>
-          <LinearGradient
-            colors={['#3A6B0A', '#234104', '#142702']}
-            style={styles.mainCard}
-          >
-            <View style={styles.breathingIcon}>
-              <Ionicons
-                name="leaf-outline"
-                size={36}
-                color="#BBFF00"
-              />
-            </View>
-
-            <Text style={styles.cardTitle}>
-              Modo Calma Urgente
-            </Text>
-
-            <Text style={styles.cardSubtitle}>
-              Um momento para desacelerar
-            </Text>
-
-            <View style={styles.breathingArea}>
-              <View style={styles.outerCircle} />
-              <View style={styles.middleCircle} />
-
-              <Animated.View
-                style={[
-                  styles.breathingCircle,
-                  {
-                    transform: [{ scale: breathingScale }],
-                  },
-                ]}
-              >
-                <Text style={styles.phaseText}>
-                  {currentPhase.name}
-                </Text>
-
-                <Text style={styles.numberText}>
-                  {seconds}
-                </Text>
-
-                <Text style={styles.secondsText}>
-                  {seconds === 1 ? 'segundo' : 'segundos'}
-                </Text>
-              </Animated.View>
-            </View>
-
-            <Text style={styles.instruction}>
-              {currentPhase.instruction}
-            </Text>
-
-            <TouchableOpacity
-              style={styles.pauseButton}
-              onPress={togglePause}
-              activeOpacity={0.8}
-            >
-              <View style={styles.pauseIconCircle}>
-                <Ionicons
-                  name={paused ? 'play' : 'pause'}
-                  size={17}
-                  color="#FFF"
-                />
-              </View>
-
-              <Text style={styles.pauseText}>
-                {paused ? 'Continuar' : 'Pausar'}
-              </Text>
-            </TouchableOpacity>
-
-            <Text style={styles.bottomHint}>
-              Não precisa respirar fundo nem seguir perfeitamente o
-              ritmo. Respeite o que for confortável para você.
-            </Text>
-          </LinearGradient>
-        </View>
-
-        {/* Barra de navegação padronizada */}
-        <LinearGradient
-          colors={['#2A4705', '#162802']}
-          style={styles.floatingBottomNav}
-        >
-          {BOTTOM_NAV_ICONS.map((item) => {
-            const ativo = item.route === 'ModoCalma';
-
-            return (
-              <TouchableOpacity
-                key={item.route}
-                style={styles.navItem}
-                activeOpacity={0.8}
-                onPress={() => navigation?.navigate(item.route)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: ativo }}
-                accessibilityLabel={
-                  item.route === 'Diario'
-                    ? 'Diário'
-                    : item.route === 'Emocao'
-                      ? 'Registro emocional'
-                      : item.route === 'Sono'
-                        ? 'Sono'
-                        : item.route === 'Grafico'
-                          ? 'Evolução emocional'
-                          : 'Modo Calma Urgente'
+            if (consultaVigente()) {
+                if (local) {
+                    setHistorico(local);
                 }
-              >
-                <View
-                  style={[
-                    styles.navCircle,
-                    ativo && styles.navCircleActive,
-                  ]}
+
+                setMensagemHistorico(local
+                    ? 'Não foi possível atualizar o histórico agora. Você pode continuar respirando.'
+                    : 'Não foi possível acessar o histórico neste dispositivo.');
+            }
+        } finally {
+            if (consultaVigente()) {
+                setSincronizando(false);
+            }
+        }
+    }
+
+    const ciclo = useMemo(() => criarCicloRespiracao({
+        aoAtualizar: (atualizado) => {
+            if (podeAtualizar(idUsuario)) {
+                setEstado(atualizado);
+            }
+        },
+        aoConcluir: ({ concluido_em }) => {
+            if (!idUsuario) {
+                return;
+            }
+
+            // Guarda um ciclo inteiro no dispositivo antes de tentar enviar.
+            registrarCicloCalma(idUsuario, concluido_em)
+                .then(() => carregarHistorico(idUsuario))
+                .catch(() => {
+                    if (podeAtualizar(idUsuario)) {
+                        setMensagemHistorico('Não foi possível guardar este ciclo no dispositivo.');
+                    }
+                });
+        },
+    }), [idUsuario]);
+
+    const fase = FASES_RESPIRACAO[estado.indiceFase];
+    const registrosHistorico = historico.registros.slice(0, 50);
+
+    // A contagem de salvos acompanha os registros exibidos no histórico recente.
+    const ciclosSalvos = registrosHistorico.filter((registro) => !registro.pendente).length;
+
+    useEffect(() => {
+        if (!estado.emExecucao) {
+            return;
+        }
+
+        // Cada ativação possui sua tag para uma liberação atrasada não afetar a retomada.
+        const tag = identificadorTela + ':' + ++versaoTelaAtiva.current;
+        let encerrado = false;
+        const liberar = () => deactivateKeepAwake(tag).catch(() => {});
+
+        activateKeepAwakeAsync(tag).then(() => {
+            if (encerrado) {
+                liberar();
+            }
+        }).catch(() => {});
+
+        return () => {
+            encerrado = true;
+            liberar();
+        };
+    }, [estado.emExecucao, identificadorTela]);
+
+    useEffect(() => {
+        // O live region atende Android/web; no iOS o VoiceOver recebe um anúncio explícito.
+        if (Platform.OS === 'ios' && estado.emExecucao) {
+            const atual = ciclo.obterEstado();
+
+            AccessibilityInfo.announceForAccessibility(fase.titulo + '. ' + atual.segundos + ' segundos.');
+        }
+    }, [ciclo, estado.versaoFase, estado.emExecucao]);
+
+    useEffect(() => {
+        montado.current = true;
+        setEstado(ciclo.obterEstado());
+
+        return () => {
+            montado.current = false;
+            ciclo.destruir();
+        };
+    }, [ciclo]);
+
+    useEffect(() => {
+        let ativo = true;
+
+        AccessibilityInfo.isReduceMotionEnabled().then((valor) => {
+            if (ativo) {
+                setReduzirMovimento(valor);
+            }
+        }).catch(() => {});
+
+        const movimento = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduzirMovimento);
+        const aplicativo = AppState.addEventListener('change', (valor) => {
+            if (valor !== 'active') {
+                ciclo.pausar();
+            }
+
+            setAppAtivo(valor === 'active');
+        });
+
+        return () => {
+            ativo = false;
+            movimento.remove();
+            aplicativo.remove();
+        };
+    }, [ciclo]);
+
+    useEffect(() => {
+        if (focado && appAtivo && !pausado && !historicoAberto) {
+            ciclo.iniciar();
+        } else {
+            ciclo.pausar();
+        }
+
+        return () => ciclo.pausar();
+    }, [ciclo, focado, appAtivo, pausado, historicoAberto]);
+
+    useEffect(() => {
+        if (!idUsuario || !focado || !appAtivo) {
+            return;
+        }
+
+        carregarHistorico(idUsuario);
+
+        const intervalo = setInterval(() => carregarHistorico(idUsuario), 30000);
+
+        return () => clearInterval(intervalo);
+    }, [idUsuario, focado, appAtivo]);
+
+    // O contador e o anel partem do mesmo tempo restante, inclusive após uma pausa.
+    useEffect(() => {
+        const atual = ciclo.obterEstado();
+
+        progresso.stopAnimation();
+        progresso.setValue(atual.progresso);
+
+        if (!atual.emExecucao || reduzirMovimento) {
+            return;
+        }
+
+        const animacao = Animated.timing(progresso, {
+            toValue: 1,
+            duration: atual.restanteMs,
+            easing: Easing.linear,
+            useNativeDriver: false,
+        });
+
+        animacao.start();
+
+        return () => animacao.stop();
+    }, [ciclo, estado.versaoFase, estado.emExecucao, progresso, reduzirMovimento,
+        reduzirMovimento ? estado.restanteMs : null]);
+
+    function alternarPausa() {
+        if (!pausado) {
+            ciclo.pausar();
+            progresso.stopAnimation();
+            progresso.setValue(ciclo.obterEstado().progresso);
+        }
+
+        setPausado((valor) => !valor);
+    }
+
+    function recomecarCiclo() {
+        progresso.stopAnimation();
+        ciclo.reiniciar();
+        progresso.setValue(0);
+
+        if (Platform.OS === 'ios' && pausado) {
+            AccessibilityInfo.announceForAccessibility('Ciclo reiniciado. A respiração continua pausada.');
+        }
+    }
+
+    const escala = progresso.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.86 + fase.inicio * 0.14, 0.86 + fase.fim * 0.14],
+    });
+    const deslocamentoAnel = progresso.interpolate({
+        inputRange: [0, 1],
+        outputRange: [CIRCUNFERENCIA * (1 - fase.inicio), CIRCUNFERENCIA * (1 - fase.fim)],
+    });
+
+    return (
+        <LinearGradient colors={['#BBFF00', '#F0FCCE', '#72A600']} style={styles.container}>
+            <SafeAreaView style={styles.safeArea}>
+                <LinearGradient colors={['#2A4705', '#162802']} style={styles.headerBar}>
+                    <TouchableOpacity
+                        style={styles.headerSide}
+                        onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate(idUsuario ? 'Home' : 'Login')}
+                        accessibilityRole="button" accessibilityLabel="Voltar"
+                    >
+                        <Ionicons name="chevron-back" size={27} color="#BBFF00" />
+                    </TouchableOpacity>
+
+                    <Text style={styles.headerTitle}>Modo calma urgente</Text>
+
+                    <TouchableOpacity
+                        style={styles.headerSide} onPress={() => navigation.navigate(idUsuario ? 'Perfil' : 'Login')}
+                        accessibilityRole="button" accessibilityLabel={idUsuario ? 'Abrir perfil' : 'Entrar na conta'}
+                    >
+                        <Ionicons name="person-circle-outline" size={31} color="#BBFF00" />
+                    </TouchableOpacity>
+                </LinearGradient>
+
+                <ScrollView contentContainerStyle={styles.content}>
+                    <LinearGradient colors={['#3A6B0A', '#234104', '#142702']} style={styles.mainCard}>
+                        <Ionicons name="leaf-outline" size={36} color="#BBFF00" />
+                        <Text style={styles.cardTitle}>Modo Calma Urgente</Text>
+                        <Text style={styles.cardSubtitle}>Um momento para desacelerar</Text>
+
+                        <View style={styles.breathingArea}>
+                            <Svg width={245} height={245} style={styles.ring} aria-hidden={true}>
+                                <Circle cx={122.5} cy={122.5} r={114} stroke="rgba(187,255,0,0.2)" strokeWidth={4} fill="none" />
+                                <CirculoAnimado
+                                    cx={122.5} cy={122.5} r={114}
+                                    stroke="#BBFF00" strokeWidth={4} fill="none"
+                                    strokeDasharray={[CIRCUNFERENCIA, CIRCUNFERENCIA]}
+                                    strokeDashoffset={deslocamentoAnel}
+                                    transform="rotate(-90 122.5 122.5)"
+                                />
+                            </Svg>
+
+                            <Animated.View style={[
+                                styles.breathingCircle,
+                                !reduzirMovimento && { transform: [{ scale: escala }] },
+                            ]}>
+                                <Text style={styles.phaseText} accessibilityLiveRegion="polite">{fase.titulo}</Text>
+                                <Text style={styles.numberText}>{estado.segundos}</Text>
+                                <Text style={styles.secondsText}>{estado.segundos === 1 ? 'segundo' : 'segundos'}</Text>
+                            </Animated.View>
+                        </View>
+
+                        <Text style={styles.supportText}>Respire, você está seguro.</Text>
+                        <Text style={styles.instruction}>{fase.instrucao}</Text>
+
+                        <View style={styles.breathingControls}>
+                            <TouchableOpacity
+                                style={[styles.pauseButton, styles.breathingPauseButton]} onPress={alternarPausa}
+                                accessibilityRole="button"
+                                accessibilityLabel={pausado ? 'Continuar respiração' : 'Pausar respiração'}
+                            >
+                                <View style={styles.pauseIconCircle}>
+                                    <Ionicons name={pausado ? 'play' : 'pause'} size={17} color="#FFF" />
+                                </View>
+
+                                <Text style={styles.pauseText}>{pausado ? 'Continuar' : 'Pausar'}</Text>
+                            </TouchableOpacity>
+
+                            {/* O botão usa somente um ícone e mantém sua descrição para leitores de tela. */}
+                            <TouchableOpacity
+                                style={styles.restartButton} onPress={recomecarCiclo} activeOpacity={0.7}
+                                accessibilityRole="button" accessibilityLabel="Recomeçar ciclo de respiração"
+                                accessibilityHint="Reinicia o ciclo atual e mantém os ciclos concluídos e o estado de pausa."
+                            >
+                                <Ionicons name="refresh-outline" size={24} color="#BBFF00" accessible={false} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.bottomHint}>
+                            Não precisa respirar fundo nem seguir perfeitamente o ritmo. Respeite o que for confortável para você.
+                        </Text>
+                        <TouchableOpacity
+                            style={styles.historyButton}
+                            onPress={() => idUsuario ? setHistoricoAberto(true) : navigation.navigate('Login')}
+                            accessibilityRole="button"
+                            accessibilityLabel={idUsuario ? 'Ver histórico de calma' : 'Entrar para salvar seus ciclos'}
+                        >
+                            <Ionicons name="time-outline" size={18} color="#BBFF00" />
+                            <Text style={styles.historyButtonText}>{idUsuario ? 'Ver histórico' : 'Entrar para salvar seus ciclos'}</Text>
+                        </TouchableOpacity>
+
+                        {!!mensagemHistorico && <Text style={styles.bottomHint}>{mensagemHistorico}</Text>}
+                    </LinearGradient>
+                </ScrollView>
+
+                <LinearGradient colors={['#2A4705', '#162802']} style={styles.floatingBottomNav}>
+                    {idUsuario ? NAVEGACAO.map((item) => (
+                        <TouchableOpacity
+                            key={item.rota} style={styles.navItem} onPress={() => navigation.navigate(item.rota)}
+                            accessibilityRole="button" accessibilityState={{ selected: item.rota === 'ModoCalma' }}
+                            accessibilityLabel={item.titulo}
+                        >
+                            <View style={[styles.navCircle, item.rota === 'ModoCalma' && styles.navCircleActive]}>
+                                <Ionicons name={item.icone} size={20} color={item.rota === 'ModoCalma' ? '#162704' : '#E0F0C0'} />
+                            </View>
+                        </TouchableOpacity>
+                    )) : (
+                        <TouchableOpacity
+                            style={styles.navItem} onPress={() => navigation.navigate('Login')}
+                            accessibilityRole="button" accessibilityLabel="Voltar ao acesso"
+                        >
+                            <Text style={styles.historyButtonText}>Voltar ao acesso</Text>
+                        </TouchableOpacity>
+                    )}
+                </LinearGradient>
+
+                <Modal
+                    visible={historicoAberto} transparent animationType={reduzirMovimento ? 'none' : 'fade'}
+                    onRequestClose={() => setHistoricoAberto(false)}
                 >
-                  <Ionicons
-                    name={item.name}
-                    size={20}
-                    color={ativo ? '#162704' : '#E0F0C0'}
-                  />
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+                    <View style={styles.modalBackdrop}>
+                        <View style={styles.historyCard} accessibilityViewIsModal>
+                            <View style={styles.historyHeader}>
+                                <Text style={[styles.cardTitle, styles.historyTitle]}>Histórico de calma</Text>
+                                <TouchableOpacity
+                                    onPress={() => setHistoricoAberto(false)} style={styles.headerSide}
+                                    accessibilityRole="button" accessibilityLabel="Fechar histórico"
+                                >
+                                    <Ionicons name="close" size={25} color="#BBFF00" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text style={styles.cardSubtitle}>Seus ciclos mais recentes · até 50 registros</Text>
+
+                            <View style={styles.historySummary}>
+                                <View style={styles.historySummaryItem}>
+                                    <Text style={styles.historySummaryValue}>{estado.ciclosConcluidos}</Text>
+                                    <Text style={styles.historySummaryLabel}>Concluídos nesta visita</Text>
+                                </View>
+
+                                <View style={styles.historySummaryItem}>
+                                    <Text style={styles.historySummaryValue}>{ciclosSalvos}</Text>
+                                    <Text style={styles.historySummaryLabel}>Salvos neste histórico</Text>
+                                </View>
+                            </View>
+
+                            {historico.pendentes > 0 && (
+                                <Text style={styles.historyPending}>
+                                    {historico.pendentes} {historico.pendentes === 1 ? 'ciclo salvo' : 'ciclos salvos'} no dispositivo, aguardando envio.
+                                </Text>
+                            )}
+
+                            <FlatList
+                                data={registrosHistorico} keyExtractor={(item) => item.id_cliente}
+                                ListEmptyComponent={<Text style={styles.emptyHistory}>Ao concluir um ciclo, ele aparecerá aqui.</Text>}
+                                renderItem={({ item }) => (
+                                    <View style={styles.historyRow}>
+                                        <Ionicons name="checkmark-circle-outline" size={24} color="#BBFF00" />
+                                        <View style={styles.historyDetails}>
+                                            <Text style={styles.historyDate}>
+                                                {new Date(item.concluido_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                                            </Text>
+                                            <Text style={styles.historyStatus}>
+                                                {item.duracao_segundos} segundos · {item.pendente ? 'Aguardando envio' : 'Salvo na sua conta'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                )}
+                            />
+
+                            {!!mensagemHistorico && <Text style={styles.bottomHint}>{mensagemHistorico}</Text>}
+                            <TouchableOpacity
+                                style={styles.pauseButton} disabled={sincronizando} onPress={() => carregarHistorico(idUsuario)}
+                                accessibilityRole="button" accessibilityState={{ disabled: sincronizando }}
+                            >
+                                <Text style={styles.pauseText}>{sincronizando ? 'Atualizando…' : 'Atualizar histórico'}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
+            </SafeAreaView>
         </LinearGradient>
-      </SafeAreaView>
-    </LinearGradient>
-  );
+    );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+    container: {
+        flex: 1,
+    },
 
-  safeArea: {
-    flex: 1,
-  },
+    safeArea: {
+        flex: 1,
+    },
 
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 12,
-    height: 60,
-    paddingHorizontal: 12,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-  },
+    headerBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginHorizontal: 16,
+        marginTop: 8,
+        marginBottom: 12,
+        height: 60,
+        paddingHorizontal: 12,
+        borderRadius: 25,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+    },
 
-  headerSide: {
-    width: 38,
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    headerSide: {
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
 
-  headerTitle: {
-    flex: 1,
-    color: '#FFF',
-    fontSize: 17,
-    fontWeight: '800',
-    textAlign: 'center',
-    letterSpacing: 0.2,
-  },
+    headerTitle: {
+        flex: 1,
+        color: '#FFF',
+        fontSize: 17,
+        fontWeight: '800',
+        textAlign: 'center',
+        letterSpacing: 0.2,
+    },
 
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 8,
-    justifyContent: 'center',
-  },
+    content: {
+        flexGrow: 1,
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 8,
+        justifyContent: 'center',
+    },
 
-  mainCard: {
-    width: '100%',
-    borderRadius: 30,
-    paddingHorizontal: 18,
-    paddingVertical: 22,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(187,255,0,0.3)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 10,
-  },
+    mainCard: {
+        maxWidth: 520,
+        width: '100%',
+        borderRadius: 30,
+        paddingHorizontal: 18,
+        paddingVertical: 22,
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: 'rgba(187,255,0,0.3)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 10,
+    },
 
-  breathingIcon: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 5,
-  },
+    breathingIcon: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 5,
+    },
 
-  cardTitle: {
-    color: '#BBFF00',
-    fontSize: 23,
-    fontWeight: '900',
-    textAlign: 'center',
-    letterSpacing: 0.3,
-    marginBottom: 3,
-  },
+    cardTitle: {
+        color: '#BBFF00',
+        fontSize: 23,
+        fontWeight: '900',
+        textAlign: 'center',
+        letterSpacing: 0.3,
+        marginBottom: 3,
+    },
 
-  cardSubtitle: {
-    color: '#E0F0C0',
-    fontSize: 13,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
+    cardSubtitle: {
+        color: '#E0F0C0',
+        fontSize: 13,
+        fontWeight: '500',
+        textAlign: 'center',
+        marginBottom: 8,
+    },
 
-  breathingArea: {
-    width: 245,
-    height: 245,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 2,
-  },
+    breathingArea: {
+        width: 245,
+        height: 245,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginVertical: 2,
+    },
 
-  outerCircle: {
-    position: 'absolute',
-    width: 232,
-    height: 232,
-    borderRadius: 116,
-    borderWidth: 3,
-    borderColor: '#BBFF00',
-  },
+    outerCircle: {
+        position: 'absolute',
+        width: 232,
+        height: 232,
+        borderRadius: 116,
+        borderWidth: 3,
+        borderColor: '#BBFF00',
+    },
 
-  middleCircle: {
-    position: 'absolute',
-    width: 214,
-    height: 214,
-    borderRadius: 107,
-    borderWidth: 1,
-    borderColor: 'rgba(187,255,0,0.28)',
-  },
+    middleCircle: {
+        position: 'absolute',
+        width: 214,
+        height: 214,
+        borderRadius: 107,
+        borderWidth: 1,
+        borderColor: 'rgba(187,255,0,0.28)',
+    },
 
-  breathingCircle: {
-    width: 188,
-    height: 188,
-    borderRadius: 94,
-    backgroundColor: '#2B7607',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#4B980F',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
-  },
+    breathingCircle: {
+        width: 188,
+        height: 188,
+        borderRadius: 94,
+        backgroundColor: '#2B7607',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1.5,
+        borderColor: '#4B980F',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 8,
+    },
 
-  phaseText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
+    phaseText: {
+        color: '#FFF',
+        fontSize: 18,
+        fontWeight: '700',
+    },
 
-  numberText: {
-    color: '#FFF',
-    fontSize: 58,
-    lineHeight: 62,
-    fontWeight: '300',
-    marginVertical: -2,
-  },
+    numberText: {
+        color: '#FFF',
+        fontSize: 58,
+        lineHeight: 62,
+        fontWeight: '300',
+        marginVertical: -2,
+    },
 
-  secondsText: {
-    color: '#FFF',
-    fontSize: 15,
-    fontWeight: '700',
-  },
+    secondsText: {
+        color: '#FFF',
+        fontSize: 15,
+        fontWeight: '700',
+    },
 
-  instruction: {
-    color: '#E0F0C0',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginTop: 5,
-    paddingHorizontal: 8,
-    lineHeight: 20,
-  },
+    instruction: {
+        color: '#E0F0C0',
+        fontSize: 14,
+        fontWeight: '600',
+        textAlign: 'center',
+        marginTop: 5,
+        paddingHorizontal: 8,
+        lineHeight: 20,
+    },
 
-  pauseButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#BBFF00',
-    borderRadius: 28,
-    minHeight: 48,
-    paddingHorizontal: 10,
-    paddingRight: 20,
-    marginTop: 12,
-    shadowColor: '#BBFF00',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 7,
-    elevation: 5,
-  },
+    breathingControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+        marginTop: 12,
+    },
 
-  pauseIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#274804',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
+    breathingPauseButton: {
+        marginTop: 0,
+    },
 
-  pauseText: {
-    color: '#274804',
-    fontSize: 16,
-    fontWeight: '900',
-  },
+    restartButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(187,255,0,0.1)',
+        borderWidth: 1.5,
+        borderColor: 'rgba(187,255,0,0.55)',
+        shadowColor: '#BBFF00',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        elevation: 3,
+    },
 
-  bottomHint: {
-    color: 'rgba(224,240,192,0.75)',
-    fontSize: 11,
-    lineHeight: 16,
-    fontWeight: '500',
-    marginTop: 10,
-    textAlign: 'center',
-  },
+    pauseButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#BBFF00',
+        borderRadius: 28,
+        minHeight: 48,
+        paddingHorizontal: 10,
+        paddingRight: 20,
+        marginTop: 12,
+        shadowColor: '#BBFF00',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 7,
+        elevation: 5,
+    },
 
-  floatingBottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    height: 62,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 30,
-    paddingHorizontal: 4,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
+    pauseIconCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#274804',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 8,
+    },
 
-  navItem: {
-    flex: 1,
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    pauseText: {
+        color: '#274804',
+        fontSize: 16,
+        fontWeight: '900',
+    },
 
-  navCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    bottomHint: {
+        color: 'rgba(224,240,192,0.75)',
+        fontSize: 11,
+        lineHeight: 16,
+        fontWeight: '500',
+        marginTop: 10,
+        textAlign: 'center',
+    },
 
-  navCircleActive: {
-    backgroundColor: '#C8FF00',
-  },
+    floatingBottomNav: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        alignItems: 'center',
+        height: 62,
+        marginHorizontal: 16,
+        marginBottom: 8,
+        borderRadius: 30,
+        paddingHorizontal: 4,
+        elevation: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+    },
+
+    navItem: {
+        flex: 1,
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    navCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'transparent',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    navCircleActive: {
+        backgroundColor: '#C8FF00',
+    },
+
+    ring: { position: 'absolute' },
+
+    supportText: { color: '#FFF', fontSize: 16, fontWeight: '700', textAlign: 'center', marginTop: 8 },
+
+    historySummary: {
+        flexDirection: 'row',
+        gap: 10,
+        marginTop: 8,
+        marginBottom: 12,
+    },
+
+    historySummaryItem: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 12,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(187,255,0,0.25)',
+        backgroundColor: 'rgba(187,255,0,0.08)',
+    },
+
+    historySummaryValue: {
+        color: '#BBFF00',
+        fontSize: 28,
+        fontWeight: '800',
+        marginBottom: 4,
+    },
+
+    historySummaryLabel: {
+        color: '#E0F0C0',
+        fontSize: 12,
+        textAlign: 'center',
+        lineHeight: 17,
+    },
+
+    historyPending: {
+        color: '#E0F0C0',
+        fontSize: 12,
+        lineHeight: 18,
+        textAlign: 'center',
+        marginBottom: 12,
+    },
+
+    historyButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 44, gap: 8 },
+
+    historyButtonText: { color: '#BBFF00', fontSize: 14, fontWeight: '700' },
+
+    modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+
+    historyCard: { width: '100%', maxWidth: 520, maxHeight: '80%', padding: 20, backgroundColor: '#234104', borderRadius: 25 },
+
+    historyHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+
+    historyTitle: { flex: 1, fontSize: 20, textAlign: 'left' },
+
+    historyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderColor: 'rgba(187,255,0,0.2)' },
+
+    historyDetails: { flex: 1, marginLeft: 10 },
+
+    historyDate: { color: '#FFF', fontSize: 14, marginBottom: 4 },
+
+    historyStatus: { color: '#E0F0C0', fontSize: 12 },
+
+    emptyHistory: { color: '#E0F0C0', textAlign: 'center', paddingVertical: 24 },
 });

@@ -1,8 +1,15 @@
 import { neon } from '@neondatabase/serverless';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'node:url';
+import { validarAmbiente } from './config/env.js';
 
-dotenv.config(); 
+// O caminho fixo evita carregar outro .env por engano.
+dotenv.config({
+    path: fileURLToPath(new URL('../.env', import.meta.url)),
+    quiet: true,
+});
 
-const sql = neon(process.env.DATABASE_URL);
+const configuracao = validarAmbiente();
+const sql = neon(configuracao.databaseUrl);
 
 export default sql;

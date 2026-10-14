@@ -1,28 +1,29 @@
 import jwt from 'jsonwebtoken';
 
 export default function verificarToken(req, res, next) {
-    // O app envia o crachá escondido no "cabeçalho" (header) da requisição
-    const authHeader = req.headers.authorization;
+    const cabecalho = req.headers.authorization;
+    const token = typeof cabecalho === 'string' ? cabecalho.match(/^Bearer ([^\s]+)$/i)?.[1] : null;
 
-    // Se não tem token, é impedido de entrar
-    if (!authHeader) {
-        return res.status(401).json({ erro: 'Acesso negado! Token não fornecido.'});
+    if (!token) {
+        return res.status(401).json({ erro: 'Acesso negado! Informe um token Bearer válido.' });
     }
 
-    // Cortar o "Bearer .." do padrão do token
-    const [, token] = authHeader.split(' ');
-
     try {
-        // Verifica se o token é falso
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // Aceita somente tokens emitidos para esta API e para este aplicativo.
+        const dados = jwt.verify(token, process.env.JWT_SECRET, {
+            algorithms: ['HS256'],
+            issuer: 'amparo-api',
+            audience: 'amparo-app',
+        });
 
-        // Se for verdadeiro, salva o token
-        req.id_usuario_logado = decoded.id_usuario;
+        if (!Number.isSafeInteger(dados.id_usuario) || dados.id_usuario <= 0 || !Number.isInteger(dados.exp)) {
+            return res.status(401).json({ erro: 'Acesso negado! Token inválido ou expirado.' });
+        }
 
-        // Permite o uso do aplitavo
+        req.id_usuario_logado = dados.id_usuario;
+
         return next();
-    } catch (error) {
-        // Se o token for falso o se passou de 7 dias
-        return res.status(401).json({ erro: 'Acesso negado! Token inválido ou expirado' });
+    } catch {
+        return res.status(401).json({ erro: 'Acesso negado! Token inválido ou expirado.' });
     }
 }
