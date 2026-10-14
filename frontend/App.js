@@ -4,7 +4,8 @@ import { LogBox, ActivityIndicator, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider, AuthContext } from './src/contexts/AuthContext';
 
 // Importação das telas a partir de ./src/screens/
@@ -49,7 +50,7 @@ function MainTabs() {
 
 // 1. Gerencia quem está logado ou não
 function AppRoutes() {
-    const { usuario, carregando } = React.useContext(AuthContext);
+    const { usuario, carregando, sessaoRestaurada } = React.useContext(AuthContext);
 
     // Tela de carregamento enquanto o AsyncStorage procura o usuário
     if (carregando) {
@@ -62,7 +63,7 @@ function AppRoutes() {
 
     return (
         <NavigationContainer>
-            <Stack.Navigator screenOptions={{ headerShown: false, animation: "fade" }}>
+            <Stack.Navigator key={usuario ? 'autenticado' : 'visitante'} initialRouteName={usuario ? (sessaoRestaurada ? 'MainTabs' : 'Intro') : 'Login'} screenOptions={{ headerShown: false, animation: "fade" }}>
 
                 {usuario ? (
                     // Se ESTIVER logado, ele só tem acesso a essas telas:
@@ -82,8 +83,12 @@ function AppRoutes() {
 
 export default function App() {
     return (
-        <AuthProvider>
-            <AppRoutes />
-        </AuthProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaProvider>
+                <AuthProvider>
+                    <AppRoutes />
+                </AuthProvider>
+            </SafeAreaProvider>
+        </GestureHandlerRootView>
     );
 }

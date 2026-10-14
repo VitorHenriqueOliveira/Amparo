@@ -47,7 +47,7 @@ router.post('/login', async (req, res) => {
 
     // Se o array retornar vazio, as credenciais estão erradas
     if (usuario.length === 0) {
-      res.status(401).json({ erro: 'E-mail ou senha incorretos' });
+      return res.status(401).json({ erro: 'E-mail ou senha incorretos' });
     }
 
     // Comparar a senha digitada com a senha criptografada do banco

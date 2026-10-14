@@ -1,167 +1,523 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   Modal,
   TextInput,
+  ScrollView,
+  Alert,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { listarSono, registrarSonoHoje } from '../storage/registros';
+import { AuthContext } from '../contexts/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function SonoScreen({ navigation }) {
-  const [sleepTime, setSleepTime] = useState('22:30');
-  const [wakeTime, setWakeTime] = useState('06:30');
+const DEFAULT_SLEEP_TIME = '22:30';
+const DEFAULT_WAKE_TIME = '06:30';
 
-  // Controle de edição dos horários
+// Mesmos cinco ícones e a mesma ordem da tela Diário.
+const BOTTOM_NAV_ITEMS = [
+  {
+    icon: 'book-outline',
+    route: 'Diario',
+    label: 'Diário Emocional',
+  },
+  {
+    icon: 'happy-outline',
+    route: 'Emocao',
+    label: 'Registro Emocional',
+  },
+  {
+    icon: 'moon-outline',
+    route: 'Sono',
+    label: 'Registro de Sono',
+  },
+  {
+    icon: 'trending-up-outline',
+    route: 'Grafico',
+    label: 'Evolução Emocional',
+  },
+  {
+    icon: 'heart-outline',
+    route: 'ModoCalma',
+    label: 'Modo Calma Urgente',
+  },
+];
+
+function isValidTime(time) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
+}
+
+function calculateDuration(sleepTime, wakeTime) {
+  const [sleepHours, sleepMinutes] = sleepTime.split(':').map(Number);
+  const [wakeHours, wakeMinutes] = wakeTime.split(':').map(Number);
+
+  const startMinutes = sleepHours * 60 + sleepMinutes;
+  let endMinutes = wakeHours * 60 + wakeMinutes;
+
+  if (endMinutes <= startMinutes) {
+    endMinutes += 24 * 60;
+  }
+
+  return endMinutes - startMinutes;
+}
+
+function formatDuration(totalMinutes) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+
+  return `${hours}h${String(minutes).padStart(2, '0')}min`;
+}
+
+function getStatusInfo(totalMinutes) {
+  if (totalMinutes < 6 * 60) {
+    return {
+      text: 'Descanso Insuficiente',
+      color: '#f80000',
+      icon: 'moon-outline',
+    };
+  }
+
+  if (totalMinutes < 7 * 60) {
+    return {
+      text: 'Descanso Moderado',
+      color: '#da8700',
+      icon: 'partly-sunny-outline',
+    };
+  }
+
+  if (totalMinutes <= 9 * 60) {
+    return {
+      text: 'Descanso Adequado',
+      color: '#44a300',
+      icon: 'checkmark-circle-outline',
+    };
+  }
+
+  return {
+    text: 'Sono acima de 9 horas',
+    color: '#da8700',
+    icon: 'moon-outline',
+  };
+}
+
+export default function SonoScreen({ navigation }) {
+  const { usuario } = useContext(AuthContext);
+  const idUsuario = usuario.id_usuario;
+  const [sleepTime, setSleepTime] = useState(DEFAULT_SLEEP_TIME);
+  const [wakeTime, setWakeTime] = useState(DEFAULT_WAKE_TIME);
+
   const [modalVisible, setModalVisible] = useState(false);
-  const [editType, setEditType] = useState(null); // 'sleep' ou 'wake'
+  const [editType, setEditType] = useState(null);
   const [tempTime, setTempTime] = useState('');
 
-  // Calcula horas e minutos totais de sono
-  const calculateSleepDuration = () => {
-    const [sHours, sMins] = sleepTime.split(':').map(Number);
-    const [wHours, wMins] = wakeTime.split(':').map(Number);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-    let startTotalMins = sHours * 60 + sMins;
-    let endTotalMins = wHours * 60 + wMins;
+  const totalMinutes = calculateDuration(sleepTime, wakeTime);
 
-    if (endTotalMins <= startTotalMins) {
-      endTotalMins += 24 * 60; // Soma 24h para a virada da noite
+  const targetMinutes = 8 * 60;
+  const progressPercent = Math.min(
+    Math.round((totalMinutes / targetMinutes) * 100),
+    100
+  );
+
+  const status = getStatusInfo(totalMinutes);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSleepData() {
+      try {
+        const history = await listarSono(idUsuario);
+
+        if (!mounted || history.length === 0) {
+          return;
+        }
+
+        const sortedHistory = [...history].sort((a, b) =>
+          b.date.localeCompare(a.date)
+        );
+
+        const latest = sortedHistory[0];
+
+        if (
+          isValidTime(latest.sleepTime) &&
+          isValidTime(latest.wakeTime)
+        ) {
+          setSleepTime(latest.sleepTime);
+          setWakeTime(latest.wakeTime);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar registros de sono:', error);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
     }
 
-    const diffMins = endTotalMins - startTotalMins;
-    const hours = Math.floor(diffMins / 60);
-    const mins = diffMins % 60;
+    loadSleepData();
 
-    return { hours, mins, totalMins: diffMins };
-  };
+    return () => {
+      mounted = false;
+    };
+  }, [idUsuario]);
 
-  const { hours, mins, totalMins } = calculateSleepDuration();
-
-  // Meta: 7 a 8 horas (420 a 480 minutos)
-  const targetMins = 480; 
-  const progressPercent = Math.min(Math.round((totalMins / targetMins) * 100), 100);
-
-  // Status de feedback
-  const getStatusInfo = () => {
-    if (hours < 6) {
-      return { text: 'Descanso Insuficiente', color: '#f80000', icon: 'moon-outline' };
-    } else if (hours >= 6 && hours < 7) {
-      return { text: 'Descanso Moderado', color: '#da8700', icon: 'partly-sunny-outline' };
+  const showMessage = (title, message) => {
+    if (Platform.OS === 'web') {
+      alert(`${title}\n\n${message}`);
+    } else {
+      Alert.alert(title, message);
     }
-    return { text: 'Descanso Adequado', color: '#44a300', icon: 'checkmark-circle-outline' };
   };
 
-  const status = getStatusInfo();
-
-  // Salvar novo horário
   const handleOpenEdit = (type) => {
     setEditType(type);
     setTempTime(type === 'sleep' ? sleepTime : wakeTime);
     setModalVisible(true);
   };
 
-  const handleSaveTime = () => {
-    // Validação simples de formato HH:MM
-    const regex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    if (regex.test(tempTime)) {
-      if (editType === 'sleep') setSleepTime(tempTime);
-      if (editType === 'wake') setWakeTime(tempTime);
+  const handleSaveTime = async () => {
+    const normalizedTime = tempTime.trim();
+
+    if (!isValidTime(normalizedTime)) {
+      showMessage(
+        'Horário inválido',
+        'Digite um horário válido no formato HH:MM, por exemplo 22:30.'
+      );
+      return;
+    }
+
+    if (!editType || saving) {
+      return;
+    }
+
+    const newSleepTime =
+      editType === 'sleep' ? normalizedTime : sleepTime;
+
+    const newWakeTime =
+      editType === 'wake' ? normalizedTime : wakeTime;
+
+    setSaving(true);
+
+    try {
+      await registrarSonoHoje(idUsuario, newSleepTime, newWakeTime);
+
+      setSleepTime(newSleepTime);
+      setWakeTime(newWakeTime);
       setModalVisible(false);
-    } else {
-      alert('Por favor, digite no formato HH:MM (ex: 22:30)');
+      setEditType(null);
+
+      showMessage(
+        'Registro salvo',
+        'Seus horários de sono foram salvos com sucesso!'
+      );
+    } catch (error) {
+      console.error('Erro ao salvar registro de sono:', error);
+
+      showMessage(
+        'Erro',
+        'Não foi possível salvar os horários. Tente novamente.'
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleNavigation = (route) => {
+    if (navigation && route) {
+      navigation.navigate(route);
     }
   };
 
   return (
     <LinearGradient
-      colors={['#7AA424', '#4E7810', '#253B06']}
+      colors={['#bbff00', '#f0fcce', '#72a600']}
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
-        {/* Cabeçalho */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={28} color="#FFF" />
+        {/* CABEÇALHO */}
+        <LinearGradient
+          colors={['#2A4705', '#162802']}
+          style={styles.headerBox}
+        >
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar"
+          >
+            <Ionicons
+              name="chevron-back"
+              size={24}
+              color="#BDE868"
+            />
           </TouchableOpacity>
+
           <Text style={styles.headerTitle}>Sono</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Perfil')}>
-            <Ionicons name="person-circle-outline" size={32} color="#FFF" />
+
+          <TouchableOpacity
+            onPress={() => handleNavigation('Perfil')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Abrir perfil"
+          >
+            <Ionicons
+              name="person-circle-outline"
+              size={26}
+              color="#BDE868"
+            />
           </TouchableOpacity>
-        </View>
+        </LinearGradient>
 
-        <View style={styles.content}>
-          {/* CARD 1: TEMPO DE SONO */}
-          <View style={styles.cardMain}>
-            <View style={styles.moonCircle}>
-              <Ionicons name="moon" size={54} color="#FFF" />
-            </View>
-
-            <Text style={styles.sleepTimeText}>
-              {hours}h{mins > 0 ? `${mins}min` : ''}
+        {/* CONTEÚDO */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#274804" />
+            <Text style={styles.loadingText}>
+              Carregando registros...
             </Text>
-            <Text style={styles.sleepTimeSub}>Tempo de sono</Text>
-
-            <View style={[styles.statusBadge, { backgroundColor: status.color }]}>
-              <Ionicons name={status.icon} size={18} color="#FFF" style={{ marginRight: 6 }} />
-              <Text style={styles.statusBadgeText}>{status.text}</Text>
-            </View>
           </View>
+        ) : (
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={styles.contentContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* CARD 1: TEMPO DE SONO */}
+            <View style={styles.cardMain}>
+              <View style={styles.moonCircle}>
+                <Ionicons name="moon" size={54} color="#FFF" />
+              </View>
 
-          {/* CARD 2: META E BARRA DE PROGRESSO */}
-          <View style={styles.cardMeta}>
-            <Text style={styles.metaTitle}>Sua meta</Text>
-            <Text style={styles.metaSubtitle}>Meta 7 a 8 horas de sono</Text>
+              <Text style={styles.sleepTimeText}>
+                {formatDuration(totalMinutes)}
+              </Text>
 
-            <View style={styles.progressBackground}>
-              <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
-            </View>
+              <Text style={styles.sleepTimeSub}>
+                Tempo de sono
+              </Text>
 
-            <View style={styles.progressLabels}>
-              <Text style={styles.progressText}>0h</Text>
-              <Text style={styles.progressText}>8h</Text>
-            </View>
-          </View>
-
-          {/* CARD 3: HORÁRIOS DORMIR / ACORDAR */}
-          <View style={styles.cardTimes}>
-            <View style={styles.timeColumn}>
-              <Ionicons name="moon-outline" size={24} color="#FFF" />
-              <Text style={styles.timeLabel}>Fui dormir ás</Text>
-              <Text style={styles.timeValue}>{sleepTime}</Text>
-              <TouchableOpacity
-                style={styles.editButton}
-                onPress={() => handleOpenEdit('sleep')}
+              <View
+                style={[
+                  styles.statusBadge,
+                  { backgroundColor: status.color },
+                ]}
               >
-                <Text style={styles.editButtonText}>Editar</Text>
-              </TouchableOpacity>
+                <Ionicons
+                  name={status.icon}
+                  size={18}
+                  color="#FFF"
+                  style={{ marginRight: 6 }}
+                />
+
+                <Text style={styles.statusBadgeText}>
+                  {status.text}
+                </Text>
+              </View>
             </View>
 
-            <View style={styles.divider} />
+            {/* CARD 2: META E PROGRESSO */}
+            <View style={styles.cardMeta}>
+              <View style={styles.metaHeader}>
+                <View>
+                  <Text style={styles.metaTitle}>Sua meta</Text>
+                  <Text style={styles.metaSubtitle}>
+                    Meta de 7 a 8 horas de sono
+                  </Text>
+                </View>
 
-            <View style={styles.timeColumn}>
-              <Ionicons name="sunny-outline" size={24} color="#FFF" />
-              <Text style={styles.timeLabel}>Acordei ás</Text>
-              <Text style={styles.timeValue}>{wakeTime}</Text>
+                <View style={styles.metaIcon}>
+                  <Ionicons
+                    name="flag-outline"
+                    size={22}
+                    color="#D6FF55"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.progressBackground}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${progressPercent}%` },
+                  ]}
+                />
+              </View>
+
+              <View style={styles.progressLabels}>
+                <Text style={styles.progressText}>0h</Text>
+                <Text style={styles.progressPercent}>
+                  {progressPercent}% da meta
+                </Text>
+                <Text style={styles.progressText}>8h</Text>
+              </View>
+            </View>
+
+            {/* CARD 3: HORÁRIOS */}
+            <View style={styles.cardTimes}>
+              <View style={styles.timeColumn}>
+                <View style={styles.timeIconCircle}>
+                  <Ionicons
+                    name="moon-outline"
+                    size={24}
+                    color="#D6FF55"
+                  />
+                </View>
+
+                <Text style={styles.timeLabel}>
+                  Fui dormir às
+                </Text>
+
+                <Text style={styles.timeValue}>
+                  {sleepTime}
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => handleOpenEdit('sleep')}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Editar horário em que fui dormir"
+                >
+                  <Ionicons
+                    name="pencil-outline"
+                    size={14}
+                    color="#FFF"
+                    style={styles.editIcon}
+                  />
+                  <Text style={styles.editButtonText}>Editar</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.divider} />
+
+              <View style={styles.timeColumn}>
+                <View style={styles.timeIconCircle}>
+                  <Ionicons
+                    name="sunny-outline"
+                    size={24}
+                    color="#D6FF55"
+                  />
+                </View>
+
+                <Text style={styles.timeLabel}>
+                  Acordei às
+                </Text>
+
+                <Text style={styles.timeValue}>
+                  {wakeTime}
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => handleOpenEdit('wake')}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Editar horário em que acordei"
+                >
+                  <Ionicons
+                    name="pencil-outline"
+                    size={14}
+                    color="#FFF"
+                    style={styles.editIcon}
+                  />
+                  <Text style={styles.editButtonText}>Editar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.historyNoteContainer}>
+              <Ionicons
+                name="shield-checkmark-outline"
+                size={16}
+                color="#325709"
+              />
+              <Text style={styles.historyNote}>
+                Seus registros são armazenados localmente no dispositivo.
+              </Text>
+            </View>
+          </ScrollView>
+        )}
+
+        {/* NAVEGAÇÃO INFERIOR: MESMA ORDEM E ÍCONES DO DIÁRIO */}
+        <LinearGradient
+          colors={['#2A4705', '#162802']}
+          style={styles.bottomNavbar}
+        >
+          {BOTTOM_NAV_ITEMS.map((item) => {
+            const isActive = item.route === 'Sono';
+
+            return (
               <TouchableOpacity
-                style={styles.editButton}
-                onPress={() => handleOpenEdit('wake')}
+                key={item.route}
+                style={styles.navItem}
+                onPress={() => handleNavigation(item.route)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={item.label}
               >
-                <Text style={styles.editButtonText}>Editar</Text>
+                {isActive ? (
+                  <View style={styles.activeCircleIcon}>
+                    <Ionicons
+                      name={item.icon}
+                      size={22}
+                      color="#162704"
+                    />
+                  </View>
+                ) : (
+                  <Ionicons
+                    name={item.icon}
+                    size={24}
+                    color="rgba(255,255,255,0.7)"
+                  />
+                )}
               </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+            );
+          })}
+        </LinearGradient>
 
-        {/* MODAL PARA EDITAR HORÁRIO */}
-        <Modal visible={modalVisible} transparent animationType="fade">
+        {/* MODAL DE EDIÇÃO */}
+        <Modal
+          visible={modalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            if (!saving) {
+              setModalVisible(false);
+              setEditType(null);
+            }
+          }}
+        >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
+              <View style={styles.modalIconCircle}>
+                <Ionicons
+                  name={editType === 'sleep' ? 'moon-outline' : 'sunny-outline'}
+                  size={28}
+                  color="#D6FF55"
+                />
+              </View>
+
               <Text style={styles.modalTitle}>
-                {editType === 'sleep' ? 'Fui dormir ás:' : 'Acordei ás:'}
+                {editType === 'sleep'
+                  ? 'Fui dormir às:'
+                  : 'Acordei às:'}
+              </Text>
+
+              <Text style={styles.modalSubtitle}>
+                Informe o horário no formato HH:MM.
               </Text>
 
               <TextInput
@@ -172,21 +528,37 @@ export default function SonoScreen({ navigation }) {
                 placeholderTextColor="#999"
                 keyboardType="numbers-and-punctuation"
                 maxLength={5}
+                autoCapitalize="none"
+                accessibilityLabel="Horário no formato horas e minutos"
               />
 
               <View style={styles.modalActions}>
                 <TouchableOpacity
                   style={styles.modalCancel}
-                  onPress={() => setModalVisible(false)}
+                  onPress={() => {
+                    setModalVisible(false);
+                    setEditType(null);
+                  }}
+                  disabled={saving}
+                  accessibilityRole="button"
                 >
-                  <Text style={styles.modalCancelText}>Cancelar</Text>
+                  <Text style={styles.modalCancelText}>
+                    Cancelar
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.modalSave}
+                  style={[
+                    styles.modalSave,
+                    saving && styles.disabledButton,
+                  ]}
                   onPress={handleSaveTime}
+                  disabled={saving}
+                  accessibilityRole="button"
                 >
-                  <Text style={styles.modalSaveText}>Salvar</Text>
+                  <Text style={styles.modalSaveText}>
+                    {saving ? 'Salvando...' : 'Salvar'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -198,43 +570,105 @@ export default function SonoScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  safeArea: { flex: 1 },
-  header: {
+  container: {
+    flex: 1,
+  },
+
+  safeArea: {
+    flex: 1,
+  },
+
+  headerBox: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 15,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 30,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFF' },
+
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+    letterSpacing: 0.5,
+  },
+
   content: {
     flex: 1,
-    paddingHorizontal: 20,
-    justifyContent: 'space-evenly',
-    paddingBottom: 20,
   },
-  // Card 1
+
+  contentContainer: {
+    flexGrow: 1,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 18,
+    justifyContent: 'space-evenly',
+    gap: 12,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+
+  loadingText: {
+    color: '#274804',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
   cardMain: {
     backgroundColor: '#2B4808',
     borderRadius: 24,
     paddingVertical: 20,
+    paddingHorizontal: 12,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
   },
+
   moonCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
     backgroundColor: '#436B09',
+    borderWidth: 1,
+    borderColor: 'rgba(214,255,85,0.35)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
   },
-  sleepTimeText: { fontSize: 32, fontWeight: 'bold', color: '#FFF' },
-  sleepTimeSub: { fontSize: 14, color: '#E0F0C0', marginBottom: 14 },
+
+  sleepTimeText: {
+    fontSize: 34,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: 0.5,
+  },
+
+  sleepTimeSub: {
+    fontSize: 14,
+    color: '#E0F0C0',
+    marginBottom: 14,
+    marginTop: 2,
+  },
+
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -242,90 +676,301 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 20,
   },
-  statusBadgeText: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
-  // Card 2
+
+  statusBadgeText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+
   cardMeta: {
     backgroundColor: '#2B4808',
     borderRadius: 20,
     padding: 18,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
+    elevation: 3,
   },
-  metaTitle: { fontSize: 16, fontWeight: 'bold', color: '#FFF' },
-  metaSubtitle: { fontSize: 13, color: '#E0F0C0', marginBottom: 12 },
+
+  metaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+
+  metaTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#FFF',
+  },
+
+  metaSubtitle: {
+    fontSize: 12,
+    color: '#E0F0C0',
+    marginTop: 4,
+  },
+
+  metaIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    backgroundColor: 'rgba(214,255,85,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(214,255,85,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
   progressBackground: {
-    height: 14,
+    height: 12,
     backgroundColor: '#1A2E03',
     borderRadius: 7,
     overflow: 'hidden',
   },
+
   progressFill: {
     height: '100%',
-    backgroundColor: '#7AA424',
+    backgroundColor: '#C8FF00',
     borderRadius: 7,
   },
+
   progressLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 6,
+    alignItems: 'center',
+    marginTop: 8,
   },
-  progressText: { fontSize: 12, color: 'rgba(255,255,255,0.6)' },
-  // Card 3
+
+  progressText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.65)',
+  },
+
+  progressPercent: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#D6FF55',
+  },
+
   cardTimes: {
     backgroundColor: '#2B4808',
     borderRadius: 20,
-    paddingVertical: 16,
+    paddingVertical: 18,
     paddingHorizontal: 10,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
+    elevation: 3,
   },
-  timeColumn: { flex: 1, alignItems: 'center' },
-  divider: { width: 1, height: '80%', backgroundColor: 'rgba(255,255,255,0.2)' },
-  timeLabel: { fontSize: 12, color: '#E0F0C0', marginTop: 4 },
-  timeValue: { fontSize: 20, fontWeight: 'bold', color: '#FFF', marginVertical: 6 },
+
+  timeColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+
+  timeIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    backgroundColor: 'rgba(214,255,85,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(214,255,85,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+
+  divider: {
+    width: 1,
+    height: 112,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginHorizontal: 6,
+  },
+
+  timeLabel: {
+    fontSize: 12,
+    color: '#E0F0C0',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+
+  timeValue: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFF',
+    marginVertical: 8,
+  },
+
   editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#436B09',
-    paddingVertical: 6,
-    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(214,255,85,0.2)',
+    paddingVertical: 8,
+    paddingHorizontal: 18,
     borderRadius: 14,
   },
-  editButtonText: { color: '#FFF', fontSize: 13, fontWeight: 'bold' },
-  // Modal
+
+  editIcon: {
+    marginRight: 5,
+  },
+
+  editButtonText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+
+  historyNoteContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    gap: 6,
+  },
+
+  historyNote: {
+    flexShrink: 1,
+    fontSize: 11,
+    color: '#274804',
+    textAlign: 'center',
+  },
+
+  bottomNavbar: {
+    borderRadius: 30,
+    height: 62,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+
+  navItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    height: '100%',
+  },
+
+  activeCircleIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#C8FF00',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#C8FF00',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
+
   modalContent: {
-    width: '80%',
+    width: '100%',
+    maxWidth: 360,
     backgroundColor: '#2B4808',
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 24,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(214,255,85,0.25)',
+    elevation: 10,
   },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#FFF', marginBottom: 15 },
+
+  modalIconCircle: {
+    width: 58,
+    height: 58,
+    borderRadius: 20,
+    backgroundColor: 'rgba(214,255,85,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+
+  modalTitle: {
+    fontSize: 19,
+    fontWeight: '900',
+    color: '#FFF',
+    marginBottom: 6,
+  },
+
+  modalSubtitle: {
+    fontSize: 13,
+    color: '#D5E7BB',
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+
   modalInput: {
     backgroundColor: '#1A2E03',
     color: '#FFF',
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
     width: '100%',
-    paddingVertical: 10,
-    borderRadius: 12,
-    marginBottom: 20,
+    paddingVertical: 12,
+    borderRadius: 14,
+    marginBottom: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(214,255,85,0.2)',
   },
-  modalActions: { flexDirection: 'row', gap: 15 },
-  modalCancel: { paddingVertical: 10, paddingHorizontal: 15 },
-  modalCancelText: { color: '#A2C876', fontSize: 15, fontWeight: '600' },
+
+  modalActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 12,
+  },
+
+  modalCancel: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+  },
+
+  modalCancelText: {
+    color: '#D5E7BB',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
   modalSave: {
-    backgroundColor: '#4E7810',
-    paddingVertical: 10,
-    paddingHorizontal: 25,
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: '#639818',
+    paddingVertical: 12,
+    paddingHorizontal: 15,
     borderRadius: 14,
   },
-  modalSaveText: { color: '#FFF', fontSize: 15, fontWeight: 'bold' },
+
+  modalSaveText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+
+  disabledButton: {
+    opacity: 0.6,
+  },
 });
