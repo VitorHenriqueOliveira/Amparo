@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { AppState } from 'react-native';
 import { observarFalhaAutenticacao } from '../services/api';
+import { sincronizarCiclosCalma } from '../services/calma';
 import {
     restaurarSessao,
     iniciarSessao,
@@ -16,6 +17,33 @@ export function AuthProvider({ children }) {
     const [usuario, setUsuario] = useState(null);
     const [carregando, setCarregando] = useState(true);
     const [sessaoRestaurada, setSessaoRestaurada] = useState(false);
+
+    useEffect(() => {
+        if (!usuario?.id_usuario) {
+            return;
+        }
+
+        function sincronizar() {
+            if (AppState.currentState === 'active') {
+                // Sem conexão, os ciclos continuam guardados na fila desta conta.
+                sincronizarCiclosCalma(usuario.id_usuario).catch(() => {});
+            }
+        }
+
+        sincronizar();
+
+        const intervalo = setInterval(sincronizar, 30000);
+        const estadoApp = AppState.addEventListener('change', (estado) => {
+            if (estado === 'active') {
+                sincronizar();
+            }
+        });
+
+        return () => {
+            clearInterval(intervalo);
+            estadoApp.remove();
+        };
+    }, [usuario?.id_usuario]);
 
     useEffect(() => {
         let ativo = true;

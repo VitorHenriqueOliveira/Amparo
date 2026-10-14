@@ -24,7 +24,7 @@ const SLIDES = [
   },
   {
     title: 'Acompanhamento',
-    text: 'Nós te ajudamos a entender sua evolução pessoal com filtros diários, semanais e mensais, mostrando claramente o impacto do seu descanso no seu humor.\n\nNosso Modo Calma Urgente estará pronto com exercícios de respiração para te acalmar instantaneamente.',
+    text: 'Nós te ajudamos a entender sua evolução pessoal com filtros diários, semanais e mensais, mostrando claramente o impacto do seu descanso no seu humor.\n\nO Modo Calma Urgente oferece um exercício de respiração guiado, disponível também offline.',
     icon: 'trending-up',
   },
 ];
