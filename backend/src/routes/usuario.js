@@ -2,116 +2,124 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import sql from '../db.js';
+import verificarToken from '../middlewares/auth.js';
 
 const router = express.Router();
 
-// Rota de Cadastro
+// Evita um caminho muito mais rápido para autenticar e-mails inexistentes.
+const hashParaUsuarioAusente = bcrypt.hashSync('comparacao-interna-sem-conta', 10);
+
+function emailValido(email) {
+    return typeof email === 'string' && email.length <= 150 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function senhaValida(senha, cadastro = false) {
+    // O bcrypt considera somente os primeiros 72 bytes da senha.
+    return typeof senha === 'string' && senha.length >= (cadastro ? 8 : 1) && Buffer.byteLength(senha) <= 72;
+}
+
+// Cadastro: valida os dados antes de consultar ou alterar o banco.
 router.post('/usuario', async (req, res) => {
-  const { nome, email, senha } = req.body;
+    const { nome, email, senha } = req.body || {};
+    const nomeNormalizado = typeof nome === 'string' ? nome.trim() : '';
+    const emailNormalizado = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
-  try {
-    // Verifica se o email já existe
-    const usuarioExistente = await sql`SELECT * FROM usuario WHERE email = ${email}`;
-
-    if (usuarioExistente.length > 0) {
-      return res.status(400).json({ erro: 'Este e-mail já está em uso.' });
+    if (!nomeNormalizado || nomeNormalizado.length > 100 || !emailValido(emailNormalizado) || !senhaValida(senha, true)) {
+        return res.status(400).json({ erro: 'Informe nome, e-mail e senha válidos. A senha deve ter pelo menos 8 caracteres e no máximo 72 bytes.' });
     }
 
-    // Criptografa a senha (10 é o "custo do processamente", padrão de mercado)
-    const salt = await bcrypt.genSalt(10);
-    const senhaCriptografada = await bcrypt.hash(senha, salt);
+    try {
+        const existentes = await sql`SELECT id_usuario FROM usuario WHERE lower(trim(email)) = ${emailNormalizado}`;
 
-    // Salva no NeonDB com a senha criptografada
-    const novoUsuario = await sql`INSERT INTO usuario (nome, email, senha) VALUES (${nome}, ${email}, ${senhaCriptografada}) RETURNING id_usuario, nome, email, data_cadastro`;
+        if (existentes.length > 0) {
+            return res.status(409).json({ erro: 'Este e-mail já está em uso.' });
+        }
 
-    // Retorna os dados do usuário recém-criado
-    res.status(201).json(novoUsuario[0]);
+        const hashSenha = await bcrypt.hash(senha, 10);
+        const usuarios = await sql`
+            INSERT INTO usuario (nome, email, senha)
+            VALUES (${nomeNormalizado}, ${emailNormalizado}, ${hashSenha})
+            RETURNING id_usuario, nome, email, data_cadastro
+        `;
 
-  } catch (error) {
-    console.error('Erro ao cadastrar usuário:', error);
-    res.status(500).json({ erro: 'Erro interno no servidor' });
-  }
-})
+        return res.status(201).json(usuarios[0]);
+    } catch (error) {
+        // Trata também o conflito detectado pelo banco, quando houver índice único.
+        if (error.code === '23505') {
+            return res.status(409).json({ erro: 'Este e-mail já está em uso.' });
+        }
 
-// Rota de Login
+        console.error('Erro ao cadastrar usuário.');
+
+        return res.status(500).json({ erro: 'Erro interno no servidor.' });
+    }
+});
+
+// Login: a resposta não informa se o erro foi no e-mail ou na senha.
 router.post('/login', async (req, res) => {
-  const { email, senha } = req.body;
+    const { email, senha } = req.body || {};
+    const emailNormalizado = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
-  try {
-    // Busca na tabela 'usuario' se existe alguém com esse e-mail e senha
-    const usuario = await sql`
-      SELECT id_usuario, nome, email, senha
-      FROM usuario 
-      WHERE email = ${email}
-    `;
-
-    // Se o array retornar vazio, as credenciais estão erradas
-    if (usuario.length === 0) {
-      return res.status(401).json({ erro: 'E-mail ou senha incorretos' });
+    if (!emailValido(emailNormalizado) || !senhaValida(senha)) {
+        return res.status(400).json({ erro: 'Informe um e-mail e uma senha válidos.' });
     }
 
-    // Comparar a senha digitada com a senha criptografada do banco
-    const senhaValida = await bcrypt.compare(senha, usuario[0].senha);
+    try {
+        const usuarios = await sql`
+            SELECT id_usuario, nome, email, senha
+            FROM usuario
+            WHERE lower(trim(email)) = ${emailNormalizado}
+        `;
 
-    if (!senhaValida) {
-      return res.status(401).json({ erro: 'E-mail ou senha incorretos' });
+        const usuario = usuarios[0];
+        const senhaCorreta = await bcrypt.compare(senha, usuario?.senha || hashParaUsuarioAusente);
+
+        // Um e-mail duplicado não pode escolher uma conta de forma ambígua.
+        if (usuarios.length !== 1 || !senhaCorreta) {
+            return res.status(401).json({ erro: 'E-mail ou senha incorretos.' });
+        }
+
+        const token = jwt.sign({ id_usuario: usuario.id_usuario }, process.env.JWT_SECRET, {
+            algorithm: 'HS256',
+            issuer: 'amparo-api',
+            audience: 'amparo-app',
+            expiresIn: '7d',
+        });
+
+        return res.json({
+            usuario: { id_usuario: usuario.id_usuario, nome: usuario.nome, email: usuario.email },
+            token,
+        });
+    } catch {
+        console.error('Erro ao autenticar usuário.');
+
+        return res.status(500).json({ erro: 'Erro interno no servidor.' });
     }
+});
 
-    // Criar um id para o usuário que vai valer por 7 dias
-    const token = jwt.sign(
-      { id_usuario: usuario[0].id_usuario },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+// Confirma a sessão restaurada no servidor, sem devolver senha ou hash.
+router.get('/sessao', verificarToken, async (req, res) => {
+    try {
+        const usuarios = await sql`
+            SELECT id_usuario, nome, email
+            FROM usuario
+            WHERE id_usuario = ${req.id_usuario_logado}
+        `;
 
-    // Se tude estiver certo, remove a senha dos dados antes de devolver pro app
-    const dadosUsuario = {
-      id_usuario: usuario[0].id_usuario,
-      nome: usuario[0].nome,
-      email: usuario[0].email
-    };
+        if (!usuarios.length) {
+            return res.status(401).json({ erro: 'Sessão inválida.' });
+        }
 
-    res.status(200).json({usuario: dadosUsuario, token: token});
+        const usuario = usuarios[0];
 
-  } catch (error) {
-    console.error('Erro no backend de login:', error);
-    res.status(500).json({ erro: 'Erro interno no servidor' });
-  }
+        return res.json({
+            usuario: { id_usuario: usuario.id_usuario, nome: usuario.nome, email: usuario.email },
+        });
+    } catch {
+        console.error('Erro ao verificar sessão.');
+
+        return res.status(500).json({ erro: 'Não foi possível verificar a sessão.' });
+    }
 });
 
 export default router;
-
-/*
-
-import express from 'express';
-import sql from '../db.js'; 
-
-const router = express.Router();
-
-// Rota para validar o Login
-router.post('/login', async (req, res) => {
-  const { email, senha } = req.body;
-
-  try {
-    // Busca na tabela 'usuario' se existe alguém com esse e-mail e senha
-    const usuario = await sql`
-      SELECT id_usuario, nome, email 
-      FROM usuario 
-      WHERE email = ${email} AND senha = ${senha}
-    `;
-
-    // Se o array retornou algo, o usuário existe!
-    if (usuario.length > 0) {
-      res.status(200).json(usuario[0]); // Retorna os dados (sem a senha, por segurança)
-    } else {
-      // Se retornou vazio, credenciais estão erradas
-      res.status(401).json({ erro: 'E-mail ou senha incorretos' });
-    }
-  } catch (error) {
-    console.error('Erro no backend de login:', error);
-    res.status(500).json({ erro: 'Erro interno no servidor' });
-  }
-});
-
-export default router;
-*/

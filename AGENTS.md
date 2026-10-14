@@ -1,3 +1,3 @@
-# Expo HAS CHANGED
+# Instruções dos agentes
 
-Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
+Antes de trabalhar neste repositório, leia e siga todas as instruções em [Agents/AGENTS.md](Agents/AGENTS.md).
