@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,53 +12,107 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { listarDiario, salvarDiario } from '../storage/registros';
 
 export default function DiarioScreen({ navigation }) {
-  const [notes, setNotes] = useState([
-    {
-      id: '1',
-      text: 'Hoje meu dia foi bastante produtivo. Consegui tirar um tempo para caminhar ao ar livre e me senti muito renovado.',
-      date: '24/08/2026',
-    },
-  ]);
-
+  const [notes, setNotes] = useState([]);
   const [text, setText] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [isWriting, setIsWriting] = useState(false);
+  const [notesLoaded, setNotesLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function carregarNotas() {
+      try {
+        const notasSalvas = await listarDiario();
+
+        if (mounted) {
+          setNotes(Array.isArray(notasSalvas) ? notasSalvas : []);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar diário:', error);
+
+        if (mounted) {
+          Alert.alert(
+            'Erro',
+            'Não foi possível carregar seus registros.'
+          );
+        }
+      } finally {
+        if (mounted) {
+          setNotesLoaded(true);
+        }
+      }
+    }
+
+    carregarNotas();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const getFormattedDate = () => {
     const today = new Date();
     const day = String(today.getDate()).padStart(2, '0');
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const year = today.getFullYear();
+
     return `${day}/${month}/${year}`;
   };
 
-  const handleSave = () => {
+  const persistirNotas = async (notasAtualizadas) => {
+    await salvarDiario(notasAtualizadas);
+    setNotes(notasAtualizadas);
+  };
+
+  const handleSave = async () => {
+    if (!notesLoaded || saving) return;
+
     if (!text.trim()) {
-      setIsWriting(false);
+      Alert.alert('Atenção', 'Escreva algo antes de salvar.');
       return;
     }
 
-    if (editingId) {
-      setNotes(
-        notes.map((note) =>
-          note.id === editingId ? { ...note, text: text.trim() } : note
-        )
-      );
-      setEditingId(null);
-    } else {
-      const newNote = {
-        id: Date.now().toString(),
-        text: text.trim(),
-        date: getFormattedDate(),
-      };
-      setNotes([newNote, ...notes]);
-    }
+    setSaving(true);
 
-    setText('');
-    setIsWriting(false);
+    try {
+      let notasAtualizadas;
+
+      if (editingId !== null) {
+        notasAtualizadas = notes.map((note) =>
+          note.id === editingId
+            ? { ...note, text: text.trim() }
+            : note
+        );
+      } else {
+        const newNote = {
+          id: Date.now().toString(),
+          text: text.trim(),
+          date: getFormattedDate(),
+        };
+
+        notasAtualizadas = [newNote, ...notes];
+      }
+
+      await persistirNotas(notasAtualizadas);
+
+      setText('');
+      setEditingId(null);
+      setIsWriting(false);
+    } catch (error) {
+      console.error('Erro ao salvar registro:', error);
+      Alert.alert(
+        'Erro ao salvar',
+        'Não foi possível salvar seu registro. Tente novamente.'
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleEdit = (note) => {
@@ -68,29 +122,64 @@ export default function DiarioScreen({ navigation }) {
   };
 
   const handleDelete = (id) => {
-    const removeNote = () => {
-      setNotes((prevNotes) => prevNotes.filter((n) => n.id !== id));
-      if (editingId === id) {
-        setEditingId(null);
-        setText('');
-        setIsWriting(false);
+    const removeNote = async () => {
+      if (!notesLoaded || saving) return;
+
+      setSaving(true);
+
+      try {
+        const notasAtualizadas = notes.filter(
+          (note) => note.id !== id
+        );
+
+        await persistirNotas(notasAtualizadas);
+
+        if (editingId === id) {
+          setEditingId(null);
+          setText('');
+          setIsWriting(false);
+        }
+      } catch (error) {
+        console.error('Erro ao excluir registro:', error);
+        Alert.alert(
+          'Erro',
+          'Não foi possível excluir o registro.'
+        );
+      } finally {
+        setSaving(false);
       }
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm('Tem certeza que deseja apagar este registro do seu diário?')) {
+      if (window.confirm('Deseja realmente excluir este registro?')) {
         removeNote();
       }
     } else {
       Alert.alert(
         'Excluir registro',
-        'Tem certeza que deseja apagar este registro do seu diário?',
+        'Deseja realmente excluir este registro?',
         [
           { text: 'Cancelar', style: 'cancel' },
-          { text: 'Excluir', style: 'destructive', onPress: removeNote },
+          {
+            text: 'Excluir',
+            style: 'destructive',
+            onPress: removeNote,
+          },
         ]
       );
     }
+  };
+
+  const handleCancel = () => {
+    setIsWriting(false);
+    setText('');
+    setEditingId(null);
+  };
+
+  const abrirNovoRegistro = () => {
+    setEditingId(null);
+    setText('');
+    setIsWriting(true);
   };
 
   return (
@@ -103,108 +192,187 @@ export default function DiarioScreen({ navigation }) {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
         >
-          {/* 1. CABEÇALHO ESCURO ARREDONDADO */}
+          {/* CABEÇALHO */}
           <LinearGradient
-            colors={['#325709', '#274804']}
+            colors={['#2A4705', '#162802']}
             style={styles.headerBox}
           >
-            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="chevron-back" size={26} color="#FFF" />
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar"
+            >
+              <Ionicons
+                name="chevron-back"
+                size={24}
+                color="#BDE868"
+              />
             </TouchableOpacity>
-            
-            <Text style={styles.headerTitle}>Diário</Text>
-            
-            <TouchableOpacity onPress={() => navigation.navigate('Perfil')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="person-circle-outline" size={30} color="#FFF" />
+
+            <Text style={styles.headerTitle}>Diário de Bordo</Text>
+
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Perfil')}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Abrir perfil"
+            >
+              <Ionicons
+                name="person-circle-outline"
+                size={26}
+                color="#BDE868"
+              />
             </TouchableOpacity>
           </LinearGradient>
 
-          {/* 2. CARD CENTRAL PRINCIPAL (CAMADA ESCURA DO CANVA) */}
+          {/* CARD PRINCIPAL */}
           <LinearGradient
             colors={['#498610', '#223f00', '#101B04']}
             style={styles.mainCardContainer}
           >
             {isWriting ? (
               <View style={styles.editorContainer}>
+                <View style={styles.editorTopBar}>
+                  <Text style={styles.editorTitleLabel}>
+                    {editingId !== null
+                      ? 'Editar Registro'
+                      : 'Novo Registro'}
+                  </Text>
+
+                  <Ionicons
+                    name="create-outline"
+                    size={18}
+                    color="#BDE868"
+                  />
+                </View>
+
                 <TextInput
                   style={styles.editorInput}
-                  placeholder="Escreva como foi seu dia aqui..."
+                  placeholder="Escreva como foi seu dia, seus sentimentos..."
                   placeholderTextColor="rgba(255, 255, 255, 0.4)"
                   multiline
                   value={text}
                   onChangeText={setText}
+                  editable={!saving}
                   autoFocus
                   textAlignVertical="top"
                 />
+
                 <View style={styles.editorActions}>
                   <TouchableOpacity
                     style={styles.cancelButton}
-                    onPress={() => {
-                      setIsWriting(false);
-                      setText('');
-                      setEditingId(null);
-                    }}
+                    onPress={handleCancel}
+                    disabled={saving}
                   >
                     <Text style={styles.cancelText}>Cancelar</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.saveButton}
+                    style={[
+                      styles.saveButton,
+                      saving && styles.disabledButton,
+                    ]}
                     onPress={handleSave}
+                    disabled={saving || !notesLoaded}
                   >
                     <Text style={styles.saveButtonText}>
-                      {editingId ? 'Atualizar' : 'Salvar'}
+                      {saving
+                        ? 'Salvando...'
+                        : editingId !== null
+                        ? 'Atualizar'
+                        : 'Salvar Registro'}
                     </Text>
                   </TouchableOpacity>
                 </View>
               </View>
             ) : (
               <View style={styles.listWrapper}>
-                {notes.length === 0 ? (
+                {!notesLoaded ? (
                   <View style={styles.emptyBox}>
-                    <Ionicons name="journal-outline" size={54} color="rgba(255,255,255,0.3)" />
                     <Text style={styles.emptyText}>
-                      Seu diário está vazio.{'\n'}Clique no "+" para começar a escrever!
+                      Carregando seus registros...
+                    </Text>
+                  </View>
+                ) : notes.length === 0 ? (
+                  <View style={styles.emptyBox}>
+                    <Ionicons
+                      name="journal-outline"
+                      size={54}
+                      color="rgba(255,255,255,0.3)"
+                    />
+                    <Text style={styles.emptyText}>
+                      Nenhum registro encontrado.{'\n'}
+                      Toque no botão abaixo para adicionar.
                     </Text>
                   </View>
                 ) : (
                   <FlatList
                     data={notes}
-                    keyExtractor={(item) => item.id}
+                    keyExtractor={(item) => String(item.id)}
                     showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingBottom: 65 }}
+                    contentContainerStyle={{
+                      paddingBottom: 90,
+                      paddingTop: 4,
+                    }}
                     renderItem={({ item }) => (
-                      <View style={styles.modernNoteCard}>
-                        {/* Data no canto superior */}
-                        <View style={styles.noteHeaderRow}>
-                          <View style={styles.dateBadge}>
-                            <Ionicons name="calendar-outline" size={12} color="#1C3205" style={{ marginRight: 4 }} />
-                            <Text style={styles.noteDateText}>{item.date}</Text>
+                      <View style={styles.emotionCardStyle}>
+                        <View style={styles.cardSideBar} />
+
+                        <View style={styles.cardContentInner}>
+                          <View style={styles.cardHeaderRow}>
+                            <View style={styles.dateBadge}>
+                              <Ionicons
+                                name="calendar-outline"
+                                size={11}
+                                color="#FFF"
+                                style={{ marginRight: 4 }}
+                              />
+                              <Text style={styles.noteDateText}>
+                                {item.date}
+                              </Text>
+                            </View>
                           </View>
-                        </View>
 
-                        {/* Texto da Nota */}
-                        <Text style={styles.noteText}>{item.text}</Text>
+                          <Text style={styles.noteText}>
+                            {item.text}
+                          </Text>
 
-                        {/* Botões Modernos de Editar/Excluir */}
-                        <View style={styles.noteActionsRow}>
-                          <TouchableOpacity
-                            style={styles.editActionBtn}
-                            onPress={() => handleEdit(item)}
-                            activeOpacity={0.8}
-                          >
-                            <Ionicons name="pencil-sharp" size={13} color="#FFF" style={{ marginRight: 4 }} />
-                            <Text style={styles.actionBtnText}>Editar</Text>
-                          </TouchableOpacity>
+                          <View style={styles.noteActionsRow}>
+                            <TouchableOpacity
+                              style={styles.editActionBtn}
+                              onPress={() => handleEdit(item)}
+                              disabled={saving}
+                              activeOpacity={0.8}
+                            >
+                              <Ionicons
+                                name="pencil"
+                                size={12}
+                                color="#BDE868"
+                                style={{ marginRight: 4 }}
+                              />
+                              <Text style={styles.actionBtnText}>
+                                Editar
+                              </Text>
+                            </TouchableOpacity>
 
-                          <TouchableOpacity
-                            style={styles.deleteActionBtn}
-                            onPress={() => handleDelete(item.id)}
-                            activeOpacity={0.8}
-                          >
-                            <Ionicons name="trash-outline" size={13} color="#FFF" style={{ marginRight: 4 }} />
-                            <Text style={styles.actionBtnText}>Excluir</Text>
-                          </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.deleteActionBtn}
+                              onPress={() => handleDelete(item.id)}
+                              disabled={saving}
+                              activeOpacity={0.8}
+                            >
+                              <Ionicons
+                                name="trash-outline"
+                                size={12}
+                                color="#FF8080"
+                                style={{ marginRight: 4 }}
+                              />
+                              <Text style={styles.deleteBtnText}>
+                                Excluir
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       </View>
                     )}
@@ -213,54 +381,107 @@ export default function DiarioScreen({ navigation }) {
               </View>
             )}
 
-            {/* BOTÃO FLUTUANTE (+) DO CANVA */}
+            {/* BOTÃO FLUTUANTE */}
             {!isWriting && (
               <TouchableOpacity
                 style={styles.fabButton}
-                onPress={() => {
-                  setEditingId(null);
-                  setText('');
-                  setIsWriting(true);
-                }}
-                activeOpacity={0.88}
+                onPress={abrirNovoRegistro}
+                activeOpacity={0.85}
+                disabled={!notesLoaded}
+                accessibilityRole="button"
+                accessibilityLabel="Adicionar registro"
               >
-                <Ionicons name="add" size={32} color="#162704" />
+                <LinearGradient
+                  colors={['#D5FF73', '#96C433']}
+                  style={styles.fabGradient}
+                >
+                  <Ionicons
+                    name="add"
+                    size={28}
+                    color="#1C3205"
+                  />
+                </LinearGradient>
               </TouchableOpacity>
             )}
           </LinearGradient>
 
-          {/* 3. BARRA DE NAVEGAÇÃO INFERIOR COM ÍCONES EM CÍRCULOS BRANCOS */}
-          <View style={styles.bottomNavbar}>
-            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Diario')}>
-              <View style={[styles.whiteCircleIcon, styles.activeCircle]}>
-                <Ionicons name="book" size={20} color="#162704" />
+          {/* NAVEGAÇÃO INFERIOR: OS CINCO ÍCONES DA HOME */}
+          <LinearGradient
+            colors={['#2A4705', '#162802']}
+            style={styles.bottomNavbar}
+          >
+            {/* Diário Emocional */}
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => navigation.navigate('Diario')}
+              accessibilityRole="button"
+              accessibilityLabel="Diário Emocional"
+            >
+              <View style={styles.activeCircleIcon}>
+                <Ionicons
+                  name="book-outline"
+                  size={22}
+                  color="#162704"
+                />
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Emocao')}>
-              <View style={styles.whiteCircleIcon}>
-                <MaterialCommunityIcons name="weather-sunny" size={22} color="#162704" />
-              </View>
+            {/* Registro Emocional */}
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => navigation.navigate('Emocao')}
+              accessibilityRole="button"
+              accessibilityLabel="Registro Emocional"
+            >
+              <Ionicons
+                name="happy-outline"
+                size={24}
+                color="rgba(255,255,255,0.7)"
+              />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Sono')}>
-              <View style={styles.whiteCircleIcon}>
-                <Ionicons name="moon-outline" size={20} color="#162704" />
-              </View>
+            {/* Registro de Sono */}
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => navigation.navigate('Sono')}
+              accessibilityRole="button"
+              accessibilityLabel="Registro de Sono"
+            >
+              <Ionicons
+                name="moon-outline"
+                size={24}
+                color="rgba(255,255,255,0.7)"
+              />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.navItem} onPress={() => alert('Em breve')}>
-              <View style={styles.whiteCircleIcon}>
-                <MaterialCommunityIcons name="weather-windy" size={22} color="#162704" />
-              </View>
+            {/* Evolução Emocional */}
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => navigation.navigate('Grafico')}
+              accessibilityRole="button"
+              accessibilityLabel="Evolução Emocional"
+            >
+              <Ionicons
+                name="trending-up-outline"
+                size={24}
+                color="rgba(255,255,255,0.7)"
+              />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.navItem} onPress={() => alert('Em breve')}>
-              <View style={styles.whiteCircleIcon}>
-                <MaterialCommunityIcons name="sprout-outline" size={22} color="#162704" />
-              </View>
+            {/* Modo Calma Urgente */}
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => navigation.navigate('ModoCalma')}
+              accessibilityRole="button"
+              accessibilityLabel="Modo Calma Urgente"
+            >
+              <Ionicons
+                name="heart-outline"
+                size={24}
+                color="rgba(255,255,255,0.7)"
+              />
             </TouchableOpacity>
-          </View>
+          </LinearGradient>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </LinearGradient>
@@ -272,7 +493,6 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   keyboardView: { flex: 1 },
 
-  // 1. Header Box
   headerBox: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -281,17 +501,22 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 12,
     paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 22,
+    paddingVertical: 14,
+    borderRadius: 30,
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
   },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFF' },
 
-  // 2. Card Central Escuro
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+    letterSpacing: 0.5,
+  },
+
   mainCardContainer: {
     flex: 1,
     borderRadius: 28,
@@ -300,7 +525,7 @@ const styles = StyleSheet.create({
     padding: 16,
     position: 'relative',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     elevation: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -308,102 +533,172 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
 
-  // Editor de Escrita
   editorContainer: { flex: 1 },
+
+  editorTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+
+  editorTitleLabel: {
+    color: '#BDE868',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+
   editorInput: {
     flex: 1,
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 15,
     lineHeight: 24,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
+
   editorActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 10,
+    paddingTop: 14,
   },
-  cancelButton: { paddingVertical: 8, paddingHorizontal: 12 },
-  cancelText: { color: '#BDE868', fontSize: 14, fontWeight: '600' },
-  saveButton: {
-    backgroundColor: '#3F6B12',
+
+  cancelButton: {
     paddingVertical: 8,
-    paddingHorizontal: 24,
+    paddingHorizontal: 12,
+  },
+
+  cancelText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  saveButton: {
+    backgroundColor: '#639818',
+    paddingVertical: 10,
+    paddingHorizontal: 22,
     borderRadius: 14,
   },
-  saveButtonText: { color: '#FFF', fontSize: 14, fontWeight: 'bold' },
 
-  // Lista & Cards Modernos de Nota
+  disabledButton: {
+    opacity: 0.6,
+  },
+
+  saveButtonText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+
   listWrapper: { flex: 1 },
-  emptyBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+  emptyBox: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
   emptyText: {
     color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 15,
+    fontSize: 14,
     textAlign: 'center',
     marginTop: 12,
+    lineHeight: 20,
   },
-  modernNoteCard: {
-    backgroundColor: '#A6C665',
-    borderRadius: 20,
-    padding: 16,
+
+  emotionCardStyle: {
+    backgroundColor: 'rgba(28, 48, 7, 0.85)',
+    borderRadius: 18,
     marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(189, 232, 104, 0.2)',
     elevation: 3,
   },
-  noteHeaderRow: {
+
+  cardSideBar: {
+    width: 6,
+    backgroundColor: '#95CD33',
+  },
+
+  cardContentInner: {
+    flex: 1,
+    padding: 14,
+  },
+
+  cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginBottom: 8,
+    alignItems: 'center',
+    marginBottom: 6,
   },
+
   dateBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     paddingVertical: 3,
-    paddingHorizontal: 10,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    borderRadius: 8,
   },
+
   noteDateText: {
     fontSize: 11,
-    color: '#1C3205',
-    fontWeight: 'bold',
+    color: '#FFF',
+    fontWeight: '500',
   },
+
   noteText: {
     fontSize: 14,
-    color: '#142503',
+    color: 'rgba(255, 255, 255, 0.9)',
     lineHeight: 21,
-    fontWeight: '500',
-    marginBottom: 14,
+    marginBottom: 12,
   },
+
   noteActionsRow: {
     flexDirection: 'row',
-    gap: 10,
+    justifyContent: 'flex-end',
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    paddingTop: 10,
   },
+
   editActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#26420A',
-    paddingVertical: 7,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
+
+  actionBtnText: {
+    color: '#BDE868',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
   deleteActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1B2C08',
-    paddingVertical: 7,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-  },
-  actionBtnText: {
-    color: '#FFF',
-    fontSize: 12,
-    fontWeight: 'bold',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
 
-  // Botão Flutuante (+)
+  deleteBtnText: {
+    color: '#FF8080',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
   fabButton: {
     position: 'absolute',
     bottom: 16,
@@ -411,9 +706,6 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: '#FFF',
-    justifyContent: 'center',
-    alignItems: 'center',
     elevation: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
@@ -422,32 +714,47 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
 
-  // 3. Navbar Inferior (Com os círculos brancos)
+  fabGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
   bottomNavbar: {
-    backgroundColor: '#1E3506',
     borderRadius: 30,
-    height: 60,
+    height: 62,
     marginHorizontal: 16,
     marginBottom: 8,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
     elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
-  navItem: { alignItems: 'center', justifyContent: 'center' },
-  whiteCircleIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFF',
+
+  navItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    height: '100%',
+  },
+
+  activeCircleIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#C8FF00',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 2,
-  },
-  activeCircle: {
-    borderWidth: 2,
-    borderColor: '#dde9bb',
+    shadowColor: '#C8FF00',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    elevation: 4,
   },
 });
