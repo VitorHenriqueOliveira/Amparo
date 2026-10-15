@@ -14,10 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path, Circle } from 'react-native-svg';
 
-import {
-  listarEmocoes,
-  listarSono,
-} from '../storage/registros';
+import { listarSono, listarEmocoes as listarEmocoesLocais } from '../storage/registros';
+import { listarEmocoes } from '../services/emocoes';
 import { listarDiario } from '../services/diario';
 import { AuthContext } from '../contexts/AuthContext';
 
@@ -412,43 +410,45 @@ export default function GraficoScreen({ navigation }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      let mounted = true;
+    useFocusEffect(
+        useCallback(() => {
+            let mounted = true;
 
-      async function carregarDados() {
-        setCarregando(true);
-        setErro(false);
+            async function carregarDados() {
+                setCarregando(true);
+                setErro(false);
 
-        try {
-          const [emocoes, diario, sono] = await Promise.all([
-            listarEmocoes(idUsuario),
-            listarDiario(idUsuario),
-            listarSono(idUsuario),
-          ]);
+                try {
+                    const [emocoes, emocoesLocais, diario, sono] = await Promise.all([
+                        listarEmocoes(),
+                        listarEmocoesLocais(idUsuario),
+                        listarDiario(idUsuario),
+                        listarSono(idUsuario),
+                    ]);
 
-          if (mounted) {
-            setDados({
-              emocoes: Array.isArray(emocoes) ? emocoes : [],
-              diario: Array.isArray(diario) ? diario : [],
-              sono: Array.isArray(sono) ? sono : [],
-            });
-          }
-        } catch (error) {
-          console.error('Erro ao carregar gráfico.');
-          if (mounted) setErro(true);
-        } finally {
-          if (mounted) setCarregando(false);
-        }
-      }
+                    if (mounted) {
+                        setDados({
+                            // O histórico anterior permanece no dispositivo da mesma conta.
+                            emocoes: [...emocoesLocais, ...emocoes],
+                            diario: Array.isArray(diario) ? diario : [],
+                            sono: Array.isArray(sono) ? sono : [],
+                        });
+                    }
+                } catch {
+                    console.error('Erro ao carregar gráfico.');
+                    if (mounted) setErro(true);
+                } finally {
+                    if (mounted) setCarregando(false);
+                }
+            }
 
-      carregarDados();
+            carregarDados();
 
-      return () => {
-        mounted = false;
-      };
-    }, [idUsuario])
-  );
+            return () => {
+                mounted = false;
+            };
+        }, [idUsuario])
+    );
 
   const hoje = new Date();
 
@@ -534,7 +534,7 @@ export default function GraficoScreen({ navigation }) {
         .sort((a, b) => {
           const dataA = new Date(a.createdAt || a.date).getTime();
           const dataB = new Date(b.createdAt || b.date).getTime();
-          return dataA - dataB;
+            return dataA - dataB || (Number(a.id) || 0) - (Number(b.id) || 0);
         });
 
       const ultimaEmocao =

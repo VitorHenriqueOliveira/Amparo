@@ -6,6 +6,7 @@ const vm = require('node:vm');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const { randomUUID } = require('node:crypto');
 
 const opcoesToken = {
     algorithm: 'HS256',
@@ -465,4 +466,106 @@ test('configuração inválida falha sem revelar credenciais', async () => {
         CORS_ORIGINS: 'https://app.example.com',
         TRUST_PROXY_HOPS: '1',
     }).origensPermitidas, ['https://app.example.com']);
+});
+
+test('registros emocionais exigem autenticação e dados definidos pelo servidor', async (t) => {
+    const api = await criarServidor(t, true);
+
+    assert.equal((await api.request('/emocoes', 'GET', undefined, null)).status, 401);
+    assert.equal((await api.request('/emocoes', 'POST', { id_emocao: 'Feliz' }, null)).status, 401);
+    assert.equal((await api.request('/emocoes', 'POST', { id_usuario: 8, id_emocao: 'Feliz' })).status, 403);
+
+    for (const id_emocao of [undefined, null, 1, [], {}, 'feliz', 'Ansioso', 'toString']) {
+        assert.equal((await api.request('/emocoes', 'POST', { id_emocao })).status, 400);
+    }
+
+    for (const campo of ['data_registro', 'hora_registro', 'registrado_em', 'id_registro_emocao']) {
+        const resposta = await api.request('/emocoes', 'POST', { id_emocao: 'Feliz', id_cliente: randomUUID(), [campo]: 'forjado' });
+        assert.equal(resposta.status, 400);
+    }
+
+    assert.equal(api.consultas.length, 0);
+});
+
+test('emoções aceitam vários registros no mesmo dia e consultam somente a conta autenticada', async (t) => {
+    const api = await criarServidor(t, true);
+    const registros = [];
+
+    api.consulta((query, valores) => {
+        if (query.includes('INSERT')) {
+            const registro = {
+                id_registro_emocao: registros.length + 1,
+                id_usuario: valores[0],
+                id_emocao: valores[1],
+                data_registro: '2026-10-14',
+                hora_registro: '02:30:00',
+                registrado_em: '2026-10-14T02:30:00.000Z',
+            };
+
+            registros.push(registro);
+
+            return [registro];
+        }
+
+        return registros.filter((registro) => registro.id_usuario === valores[0]).reverse();
+    });
+
+    for (const id_emocao of ['Feliz', 'Triste', 'Neutro', 'Raiva', 'Feliz']) {
+        const id_cliente = randomUUID();
+        const resposta = await api.request('/emocoes', 'POST', { id_emocao, id_cliente });
+        const registro = await resposta.json();
+
+        assert.equal(resposta.status, 201);
+        assert.equal(registro.id_usuario, 7);
+        assert.equal(registro.id_emocao, id_emocao);
+        assert.equal(registro.data_registro, '2026-10-14');
+        assert.equal(registro.hora_registro, '02:30:00');
+        assert.deepEqual(api.consultas.at(-1).valores, [7, id_emocao, id_cliente]);
+        assert.match(api.consultas.at(-1).query, /ON CONFLICT \(id_usuario, id_cliente\) DO NOTHING/);
+    }
+
+    assert.equal(new Set(registros.map((registro) => registro.id_registro_emocao)).size, 5);
+    assert.equal((await (await api.request('/emocoes?id_usuario=8')).json()).length, 5);
+    assert.deepEqual(api.consultas.at(-1).valores, [7]);
+    assert.match(api.consultas.at(-1).query, /WHERE id_usuario/);
+    assert.match(api.consultas.at(-1).query, /ORDER BY registro_emocional.data_registro DESC, id_registro_emocao DESC/);
+
+    const tokenOutraConta = jwt.sign({ id_usuario: 8 }, process.env.JWT_SECRET, opcoesToken);
+    const cabecalho = 'Bearer ' + tokenOutraConta;
+
+    assert.deepEqual(await (await api.request('/emocoes', 'GET', undefined, cabecalho)).json(), []);
+    assert.deepEqual(api.consultas.at(-1).valores, [8]);
+    assert.equal((await api.request('/emocoes', 'POST', { id_emocao: 'Triste', id_cliente: randomUUID() }, cabecalho)).status, 201);
+    assert.equal((await (await api.request('/emocoes', 'GET', undefined, cabecalho)).json()).length, 1);
+    assert.equal((await (await api.request('/emocoes')).json()).length, 5);
+});
+
+test('falhas no banco de emoções retornam erro sem divulgar informações internas', async (t) => {
+    const api = await criarServidor(t, true);
+
+    api.consulta(() => { throw new Error('Detalhes internos que não devem aparecer'); });
+
+    for (const [metodo, body] of [['GET', undefined], ['POST', { id_emocao: 'Feliz', id_cliente: randomUUID() }]]) {
+        const resposta = await api.request('/emocoes', metodo, body);
+
+        assert.equal(resposta.status, 500);
+        assert.doesNotMatch(JSON.stringify(await resposta.json()), /Detalhes internos/);
+    }
+});
+
+test('reenvio da confirmação recupera a emoção original e rejeita mudança de conteúdo', async (t) => {
+    const api = await criarServidor(t, true);
+    const id_cliente = randomUUID();
+    const original = { id_registro_emocao: 9, id_usuario: 7, id_emocao: 'Feliz', registrado_em: '2026-10-14T02:30:00.123Z' };
+    api.consulta((query) => query.includes('INSERT') ? [] : [original]);
+
+    const resposta = await api.request('/emocoes', 'POST', { id_emocao: 'Feliz', id_cliente });
+    assert.equal(resposta.status, 200);
+    assert.deepEqual(await resposta.json(), original);
+    assert.deepEqual(api.consultas.at(-1).valores, [7, id_cliente]);
+    assert.equal((await api.request('/emocoes', 'POST', { id_emocao: 'Triste', id_cliente })).status, 409);
+
+    for (const invalido of [undefined, null, 123, [], 'nao-uuid']) {
+        assert.equal((await api.request('/emocoes', 'POST', { id_emocao: 'Feliz', id_cliente: invalido })).status, 400);
+    }
 });

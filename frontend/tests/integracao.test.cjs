@@ -15,7 +15,7 @@ async function carregar(arquivo, imports, globais = {}) {
     await modulo.link((specifier) => {
         assert.ok(specifier in imports, 'Dependência inesperada: ' + specifier);
 
-        const namespace = ['expo-secure-store', 'react-native', 'jwt-decode'].includes(specifier)
+        const namespace = ['expo-secure-store', 'expo-crypto', 'react-native', 'jwt-decode'].includes(specifier)
             ? imports[specifier]
             : { default: imports[specifier] };
 
@@ -327,9 +327,11 @@ test('produção rejeita API sem HTTPS antes de enviar credenciais', async () =>
 });
 
 test('emoções e sono ficam separados ao trocar de conta', async () => {
-    const storage = storageMock([['@amparo/emocoes', JSON.stringify([{ emotionKey: 'triste' }])]]);
+    const storage = storageMock([
+        ['@amparo/emocoes', JSON.stringify([{ emotionKey: 'triste' }])],
+        ['@amparo/emocoes:7', JSON.stringify([{ emotionKey: 'feliz' }])],
+    ]);
     const registros = await carregar('src/storage/registros.js', { '@react-native-async-storage/async-storage': storage });
-    await registros.adicionarEmocao(7, 'feliz', 'Feliz');
     await registros.registrarSonoHoje(7, '22:30', '06:30');
     assert.equal((await registros.listarEmocoes(7))[0].emotionKey, 'feliz');
     assert.equal((await registros.listarSono(7))[0].totalMinutes, 480);
@@ -380,4 +382,88 @@ test('falha da API do diário é propagada sem cair em persistência local', asy
     const api = { get: async () => { throw new Error('API indisponível'); } };
     const diario = await carregar('src/services/diario.js', { './api': api });
     await assert.rejects(diario.listarDiario(7), /indisponível/);
+});
+
+test('emoções enviam somente a seleção e preservam o timestamp e todos os registros da API', async () => {
+    const chamadas = [];
+    const registro = {
+        id_registro_emocao: 42,
+        id_usuario: 7,
+        id_emocao: 'Feliz',
+        data_registro: '2026-10-14',
+        hora_registro: '02:30:00',
+        registrado_em: '2026-10-14T02:30:00.000Z',
+    };
+    const api = {
+        async post(...args) {
+            chamadas.push(['post', ...args]);
+
+            return { data: { ...registro, id_emocao: args[1].id_emocao } };
+        },
+        async get(...args) {
+            chamadas.push(['get', ...args]);
+
+            return { data: [registro, { ...registro, id_registro_emocao: 43, id_emocao: 'Triste' }] };
+        },
+    };
+    const idCliente = 'c0b91490-11f5-4696-8bfd-968e21b87bba';
+    const emocoes = await carregar('src/services/emocoes.js', { './api': api, 'expo-crypto': { randomUUID: () => idCliente } });
+
+    for (const [chave, titulo] of [['feliz', 'Feliz'], ['triste', 'Triste'], ['neutro', 'Neutro'], ['raiva', 'Raiva']]) {
+        const salvo = await emocoes.adicionarEmocao(chave, emocoes.criarIdConfirmacao());
+
+        assert.equal(salvo.id, 42);
+        assert.equal(salvo.emotionKey, chave);
+        assert.equal(salvo.emotionTitle, titulo);
+        assert.equal(salvo.date, registro.registrado_em);
+        assert.equal(salvo.createdAt, registro.registrado_em);
+        assert.deepEqual(JSON.parse(JSON.stringify(chamadas.at(-1))), ['post', '/emocoes', { id_emocao: titulo, id_cliente: idCliente }]);
+    }
+
+    const historico = await emocoes.listarEmocoes();
+
+    assert.equal(historico.length, 2);
+    assert.equal(historico[0].id, 42);
+    assert.equal(historico[1].id, 43);
+    assert.equal(historico[1].emotionKey, 'triste');
+    assert.deepEqual(JSON.parse(JSON.stringify(chamadas.at(-1))), ['get', '/emocoes']);
+});
+
+test('emoções inválidas não chegam à API e falhas de rede não confirmam persistência', async () => {
+    let chamadas = 0;
+    const api = {
+        async post() {
+            chamadas++;
+            throw new Error('API indisponível');
+        },
+        async get() {
+            throw new Error('API indisponível');
+        },
+    };
+    const emocoes = await carregar('src/services/emocoes.js', { './api': api, 'expo-crypto': { randomUUID: () => 'c0b91490-11f5-4696-8bfd-968e21b87bba' } });
+
+    for (const chave of [undefined, null, [], ['feliz'], {}, '', 'Feliz', 'ansioso', 'toString', '__proto__']) {
+        await assert.rejects(emocoes.adicionarEmocao(chave), /válida/);
+    }
+
+    assert.equal(chamadas, 0);
+    await assert.rejects(emocoes.adicionarEmocao('feliz', emocoes.criarIdConfirmacao()), /indisponível/);
+    assert.equal(chamadas, 1);
+    await assert.rejects(emocoes.listarEmocoes(), /indisponível/);
+});
+
+test('tentativa de reenvio usa o mesmo identificador de confirmação', async () => {
+    const chamadas = [];
+    const id_cliente = 'c0b91490-11f5-4696-8bfd-968e21b87bba';
+    const api = { async post(rota, body) {
+        chamadas.push({ rota, body });
+        if (chamadas.length === 1) throw new Error('Resposta perdida');
+        return { data: { id_registro_emocao: 42, id_emocao: 'Feliz', registrado_em: '2026-10-14T02:30:00Z' } };
+    } };
+    const emocoes = await carregar('src/services/emocoes.js', { './api': api, 'expo-crypto': { randomUUID: () => id_cliente } });
+    const confirmacao = emocoes.criarIdConfirmacao();
+    await assert.rejects(emocoes.adicionarEmocao('feliz', confirmacao), /perdida/);
+    assert.equal((await emocoes.adicionarEmocao('feliz', confirmacao)).id, 42);
+    assert.equal(chamadas[0].body.id_cliente, chamadas[1].body.id_cliente);
+    await assert.rejects(emocoes.adicionarEmocao('feliz'), /Identificador/);
 });

@@ -22,13 +22,6 @@ export function listarEmocoes(idUsuario) {
   return lerLista('emocoes', idUsuario);
 }
 
-export async function adicionarEmocao(idUsuario, emotionKey, emotionTitle) {
-  const registros = await listarEmocoes(idUsuario);
-  const registro = { id: gerarId(), emotionKey, emotionTitle, date: new Date().toISOString() };
-  await guardarLista('emocoes', idUsuario, [...registros, registro]);
-  return registro;
-}
-
 export function listarSono(idUsuario) {
   return lerLista('sono', idUsuario);
 }
