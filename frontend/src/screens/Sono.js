@@ -1,976 +1,877 @@
-import React, { useEffect, useState, useContext } from 'react';
+import { AreaDaTela, Cabecalho, NavegacaoInferior } from '../components/NavegacaoPadrao';
+import { CORES, DEGRADES } from '../theme/tema';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-  TextInput,
-  ScrollView,
-  Alert,
-  Platform,
-  ActivityIndicator,
+    AccessibilityInfo,
+    ActivityIndicator,
+    AppState,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { listarSono, registrarSonoHoje } from '../storage/registros';
-import { AuthContext } from '../contexts/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-
-const DEFAULT_SLEEP_TIME = '22:30';
-const DEFAULT_WAKE_TIME = '06:30';
-
-// Mesmos cinco ícones e a mesma ordem da tela Diário.
-const BOTTOM_NAV_ITEMS = [
-  {
-    icon: 'book-outline',
-    route: 'Diario',
-    label: 'Diário Emocional',
-  },
-  {
-    icon: 'happy-outline',
-    route: 'Emocao',
-    label: 'Registro Emocional',
-  },
-  {
-    icon: 'moon-outline',
-    route: 'Sono',
-    label: 'Registro de Sono',
-  },
-  {
-    icon: 'trending-up-outline',
-    route: 'Grafico',
-    label: 'Evolução Emocional',
-  },
-  {
-    icon: 'heart-outline',
-    route: 'ModoCalma',
-    label: 'Modo Calma Urgente',
-  },
-];
-
-function isValidTime(time) {
-  return /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
+import { AuthContext } from '../contexts/AuthContext';
+import SeletorHorario from '../components/SeletorHorario';
+import { atualizarMetaSono, buscarSono, registrarSonoHoje } from '../services/sono';
+import { avaliarMeta, calcularDuracao, formatarDuracao } from '../utils/sono';
+function dataCurta(dia) {
+    return dia ? dia.split('-').reverse().join('/') : '';
 }
-
-function calculateDuration(sleepTime, wakeTime) {
-  const [sleepHours, sleepMinutes] = sleepTime.split(':').map(Number);
-  const [wakeHours, wakeMinutes] = wakeTime.split(':').map(Number);
-
-  const startMinutes = sleepHours * 60 + sleepMinutes;
-  let endMinutes = wakeHours * 60 + wakeMinutes;
-
-  if (endMinutes <= startMinutes) {
-    endMinutes += 24 * 60;
-  }
-
-  return endMinutes - startMinutes;
+function Botao({ children, onPress, disabled, secundario, label }) {
+    return (
+        <TouchableOpacity
+            onPress={onPress}
+            disabled={disabled}
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            accessibilityState={{
+                disabled: !!disabled,
+            }}
+            style={[styles.botao, secundario && styles.botaoSecundario, disabled && styles.desabilitado]}
+        >
+            <Text style={[styles.botaoTexto, secundario && styles.botaoTextoSecundario]}>{children}</Text>
+        </TouchableOpacity>
+    );
 }
-
-function formatDuration(totalMinutes) {
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  if (minutes === 0) {
-    return `${hours}h`;
-  }
-
-  return `${hours}h${String(minutes).padStart(2, '0')}min`;
+function AjusteMeta({ titulo, valor, onChange, minimo, maximo, disabled }) {
+    return (
+        <View style={styles.ajusteMeta}>
+            <Text style={styles.labelEscuro}>{titulo}</Text>
+            <View style={styles.ajusteControles}>
+                <TouchableOpacity
+                    style={styles.ajusteBotao}
+                    onPress={() => onChange(valor - 1)}
+                    disabled={disabled || valor <= minimo}
+                    accessibilityRole="button"
+                    accessibilityLabel={'Diminuir ' + titulo.toLowerCase()}
+                    accessibilityState={{
+                        disabled: disabled || valor <= minimo,
+                    }}
+                >
+                    <Ionicons name="remove" size={22} color={valor <= minimo ? '#B3BDA7' : '#29491A'} />
+                </TouchableOpacity>
+                <Text style={styles.ajusteValor} accessibilityLiveRegion="polite">
+                    {valor}h
+                </Text>
+                <TouchableOpacity
+                    style={styles.ajusteBotao}
+                    onPress={() => onChange(valor + 1)}
+                    disabled={disabled || valor >= maximo}
+                    accessibilityRole="button"
+                    accessibilityLabel={'Aumentar ' + titulo.toLowerCase()}
+                    accessibilityState={{
+                        disabled: disabled || valor >= maximo,
+                    }}
+                >
+                    <Ionicons name="add" size={22} color={valor >= maximo ? '#B3BDA7' : '#29491A'} />
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
 }
-
-function getStatusInfo(totalMinutes) {
-  if (totalMinutes < 6 * 60) {
-    return {
-      text: 'Descanso Insuficiente',
-      color: '#f80000',
-      icon: 'moon-outline',
-    };
-  }
-
-  if (totalMinutes < 7 * 60) {
-    return {
-      text: 'Descanso Moderado',
-      color: '#da8700',
-      icon: 'partly-sunny-outline',
-    };
-  }
-
-  if (totalMinutes <= 9 * 60) {
-    return {
-      text: 'Descanso Adequado',
-      color: '#44a300',
-      icon: 'checkmark-circle-outline',
-    };
-  }
-
-  return {
-    text: 'Sono acima de 9 horas',
-    color: '#da8700',
-    icon: 'moon-outline',
-  };
-}
-
 export default function SonoScreen({ navigation }) {
-  const { usuario } = useContext(AuthContext);
-  const idUsuario = usuario.id_usuario;
-  const [sleepTime, setSleepTime] = useState(DEFAULT_SLEEP_TIME);
-  const [wakeTime, setWakeTime] = useState(DEFAULT_WAKE_TIME);
-
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editType, setEditType] = useState(null);
-  const [tempTime, setTempTime] = useState('');
-
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  const totalMinutes = calculateDuration(sleepTime, wakeTime);
-
-  const targetMinutes = 8 * 60;
-  const progressPercent = Math.min(
-    Math.round((totalMinutes / targetMinutes) * 100),
-    100
-  );
-
-  const status = getStatusInfo(totalMinutes);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadSleepData() {
-      try {
-        const history = await listarSono(idUsuario);
-
-        if (!mounted || history.length === 0) {
-          return;
-        }
-
-        const sortedHistory = [...history].sort((a, b) =>
-          b.date.localeCompare(a.date)
-        );
-
-        const latest = sortedHistory[0];
-
-        if (
-          isValidTime(latest.sleepTime) &&
-          isValidTime(latest.wakeTime)
-        ) {
-          setSleepTime(latest.sleepTime);
-          setWakeTime(latest.wakeTime);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar registros de sono:', error);
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadSleepData();
-
-    return () => {
-      mounted = false;
-    };
-  }, [idUsuario]);
-
-  const showMessage = (title, message) => {
-    if (Platform.OS === 'web') {
-      alert(`${title}\n\n${message}`);
-    } else {
-      Alert.alert(title, message);
-    }
-  };
-
-  const handleOpenEdit = (type) => {
-    setEditType(type);
-    setTempTime(type === 'sleep' ? sleepTime : wakeTime);
-    setModalVisible(true);
-  };
-
-  const handleSaveTime = async () => {
-    const normalizedTime = tempTime.trim();
-
-    if (!isValidTime(normalizedTime)) {
-      showMessage(
-        'Horário inválido',
-        'Digite um horário válido no formato HH:MM, por exemplo 22:30.'
-      );
-      return;
-    }
-
-    if (!editType || saving) {
-      return;
-    }
-
-    const newSleepTime =
-      editType === 'sleep' ? normalizedTime : sleepTime;
-
-    const newWakeTime =
-      editType === 'wake' ? normalizedTime : wakeTime;
-
-    setSaving(true);
-
-    try {
-      await registrarSonoHoje(idUsuario, newSleepTime, newWakeTime);
-
-      setSleepTime(newSleepTime);
-      setWakeTime(newWakeTime);
-      setModalVisible(false);
-      setEditType(null);
-
-      showMessage(
-        'Registro salvo',
-        'Seus horários de sono foram salvos com sucesso!'
-      );
-    } catch (error) {
-      console.error('Erro ao salvar registro de sono:', error);
-
-      showMessage(
-        'Erro',
-        'Não foi possível salvar os horários. Tente novamente.'
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleNavigation = (route) => {
-    if (navigation && route) {
-      navigation.navigate(route);
-    }
-  };
-
-  return (
-    <LinearGradient
-      colors={['#bbff00', '#f0fcce', '#72a600']}
-      style={styles.container}
-    >
-      <SafeAreaView style={styles.safeArea}>
-        {/* CABEÇALHO */}
-        <LinearGradient
-          colors={['#2A4705', '#162802']}
-          style={styles.headerBox}
-        >
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel="Voltar"
-          >
-            <Ionicons
-              name="chevron-back"
-              size={24}
-              color="#BDE868"
-            />
-          </TouchableOpacity>
-
-          <Text style={styles.headerTitle}>Sono</Text>
-
-          <TouchableOpacity
-            onPress={() => handleNavigation('Perfil')}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel="Abrir perfil"
-          >
-            <Ionicons
-              name="person-circle-outline"
-              size={26}
-              color="#BDE868"
-            />
-          </TouchableOpacity>
-        </LinearGradient>
-
-        {/* CONTEÚDO */}
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#274804" />
-            <Text style={styles.loadingText}>
-              Carregando registros...
-            </Text>
-          </View>
-        ) : (
-          <ScrollView
-            style={styles.content}
-            contentContainerStyle={styles.contentContainer}
-            showsVerticalScrollIndicator={false}
-          >
-            {/* CARD 1: TEMPO DE SONO */}
-            <View style={styles.cardMain}>
-              <View style={styles.moonCircle}>
-                <Ionicons name="moon" size={54} color="#FFF" />
-              </View>
-
-              <Text style={styles.sleepTimeText}>
-                {formatDuration(totalMinutes)}
-              </Text>
-
-              <Text style={styles.sleepTimeSub}>
-                Tempo de sono
-              </Text>
-
-              <View
-                style={[
-                  styles.statusBadge,
-                  { backgroundColor: status.color },
-                ]}
-              >
-                <Ionicons
-                  name={status.icon}
-                  size={18}
-                  color="#FFF"
-                  style={{ marginRight: 6 }}
-                />
-
-                <Text style={styles.statusBadgeText}>
-                  {status.text}
-                </Text>
-              </View>
-            </View>
-
-            {/* CARD 2: META E PROGRESSO */}
-            <View style={styles.cardMeta}>
-              <View style={styles.metaHeader}>
-                <View>
-                  <Text style={styles.metaTitle}>Sua meta</Text>
-                  <Text style={styles.metaSubtitle}>
-                    Meta de 7 a 8 horas de sono
-                  </Text>
-                </View>
-
-                <View style={styles.metaIcon}>
-                  <Ionicons
-                    name="flag-outline"
-                    size={22}
-                    color="#D6FF55"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.progressBackground}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    { width: `${progressPercent}%` },
-                  ]}
-                />
-              </View>
-
-              <View style={styles.progressLabels}>
-                <Text style={styles.progressText}>0h</Text>
-                <Text style={styles.progressPercent}>
-                  {progressPercent}% da meta
-                </Text>
-                <Text style={styles.progressText}>8h</Text>
-              </View>
-            </View>
-
-            {/* CARD 3: HORÁRIOS */}
-            <View style={styles.cardTimes}>
-              <View style={styles.timeColumn}>
-                <View style={styles.timeIconCircle}>
-                  <Ionicons
-                    name="moon-outline"
-                    size={24}
-                    color="#D6FF55"
-                  />
-                </View>
-
-                <Text style={styles.timeLabel}>
-                  Fui dormir às
-                </Text>
-
-                <Text style={styles.timeValue}>
-                  {sleepTime}
-                </Text>
-
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => handleOpenEdit('sleep')}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel="Editar horário em que fui dormir"
-                >
-                  <Ionicons
-                    name="pencil-outline"
-                    size={14}
-                    color="#FFF"
-                    style={styles.editIcon}
-                  />
-                  <Text style={styles.editButtonText}>Editar</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.divider} />
-
-              <View style={styles.timeColumn}>
-                <View style={styles.timeIconCircle}>
-                  <Ionicons
-                    name="sunny-outline"
-                    size={24}
-                    color="#D6FF55"
-                  />
-                </View>
-
-                <Text style={styles.timeLabel}>
-                  Acordei às
-                </Text>
-
-                <Text style={styles.timeValue}>
-                  {wakeTime}
-                </Text>
-
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => handleOpenEdit('wake')}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel="Editar horário em que acordei"
-                >
-                  <Ionicons
-                    name="pencil-outline"
-                    size={14}
-                    color="#FFF"
-                    style={styles.editIcon}
-                  />
-                  <Text style={styles.editButtonText}>Editar</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.historyNoteContainer}>
-              <Ionicons
-                name="shield-checkmark-outline"
-                size={16}
-                color="#325709"
-              />
-              <Text style={styles.historyNote}>
-                Seus registros são armazenados localmente no dispositivo.
-              </Text>
-            </View>
-          </ScrollView>
-        )}
-
-        {/* NAVEGAÇÃO INFERIOR: MESMA ORDEM E ÍCONES DO DIÁRIO */}
-        <LinearGradient
-          colors={['#2A4705', '#162802']}
-          style={styles.bottomNavbar}
-        >
-          {BOTTOM_NAV_ITEMS.map((item) => {
-            const isActive = item.route === 'Sono';
-
-            return (
-              <TouchableOpacity
-                key={item.route}
-                style={styles.navItem}
-                onPress={() => handleNavigation(item.route)}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel={item.label}
-              >
-                {isActive ? (
-                  <View style={styles.activeCircleIcon}>
-                    <Ionicons
-                      name={item.icon}
-                      size={22}
-                      color="#162704"
-                    />
-                  </View>
-                ) : (
-                  <Ionicons
-                    name={item.icon}
-                    size={24}
-                    color="rgba(255,255,255,0.7)"
-                  />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </LinearGradient>
-
-        {/* MODAL DE EDIÇÃO */}
-        <Modal
-          visible={modalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => {
-            if (!saving) {
-              setModalVisible(false);
-              setEditType(null);
+    const { usuario } = useContext(AuthContext);
+    const [dados, setDados] = useState(null);
+    const [carregando, setCarregando] = useState(true);
+    const [erro, setErro] = useState('');
+    const [modal, setModal] = useState('horarios');
+    const [modalAberto, setModalAberto] = useState(false);
+    const [inicio, setInicio] = useState('');
+    const [fim, setFim] = useState('');
+    const [diaEdicao, setDiaEdicao] = useState('');
+    const [min, setMin] = useState(7);
+    const [max, setMax] = useState(8);
+    const [erroForm, setErroForm] = useState('');
+    const [salvando, setSalvando] = useState(false);
+    const [mensagem, setMensagem] = useState('');
+    const vivo = useRef(true);
+    const gravando = useRef(false);
+    const versao = useRef(0);
+    useEffect(() => {
+        vivo.current = true;
+        return () => {
+            vivo.current = false;
+            versao.current++;
+        };
+    }, [usuario.id_usuario]);
+    const carregar = useCallback(async () => {
+        if (gravando.current) return;
+        const consulta = ++versao.current;
+        try {
+            const resposta = await buscarSono();
+            if (vivo.current && consulta === versao.current) {
+                setDados(resposta);
+                setErro('');
             }
-          }}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalIconCircle}>
-                <Ionicons
-                  name={editType === 'sleep' ? 'moon-outline' : 'sunny-outline'}
-                  size={28}
-                  color="#D6FF55"
-                />
-              </View>
+        } catch {
+            if (vivo.current && consulta === versao.current) {
+                setErro('Não foi possível carregar seu sono. Verifique a conexão e tente novamente.');
+            }
+        } finally {
+            if (vivo.current && consulta === versao.current) setCarregando(false);
+        }
+    }, [usuario.id_usuario]);
+    useFocusEffect(
+        useCallback(() => {
+            carregar();
+            const listener = AppState.addEventListener('change', (estado) => {
+                if (estado === 'active') carregar();
+            });
+            return () => listener.remove();
+        }, [carregar])
+    );
+    useEffect(() => {
+        if (!dados) return;
+        let timer;
+        const atualizarDia = () => {
+            if (gravando.current) timer = setTimeout(atualizarDia, 1000);
+            else carregar();
+        };
+        timer = setTimeout(atualizarDia, dados.atualizarEm + 1000);
+        return () => clearTimeout(timer);
+    }, [dados?.atualizarEm, carregar]);
+    useEffect(() => {
+        if (!mensagem) return;
+        AccessibilityInfo.announceForAccessibility(mensagem);
+        const timer = setTimeout(() => setMensagem(''), 3000);
+        return () => clearTimeout(timer);
+    }, [mensagem]);
+    const registro = dados?.registro;
+    const duracao = registro?.totalMinutes ?? null;
+    const status = avaliarMeta(duracao, dados?.meta.min, dados?.meta.max);
+    const previa = calcularDuracao(inicio, fim);
+    const abrir = (tipo) => {
+        if (!dados || erro || gravando.current) return;
+        setErroForm('');
+        setMensagem('');
+        setInicio(registro?.sleepTime || '');
+        setFim(registro?.wakeTime || '');
+        setDiaEdicao(dados.hoje);
+        setMin(dados.meta.min);
+        setMax(dados.meta.max);
+        setModal(tipo);
+        setModalAberto(true);
+    };
+    const fecharModal = () => {
+        if (!gravando.current) setModalAberto(false);
+    };
+    const salvar = async () => {
+        if (gravando.current || !modalAberto) return;
+        if (modal === 'horarios' && diaEdicao !== dados.hoje) {
+            setDiaEdicao(dados.hoje);
+            setErroForm('O dia mudou. Confira a nova data e salve novamente.');
+            return;
+        }
+        gravando.current = true;
+        ++versao.current;
+        setSalvando(true);
+        setErroForm('');
+        try {
+            if (modal === 'horarios') {
+                const salvo = await registrarSonoHoje(inicio, fim, diaEdicao);
+                if (!vivo.current) return;
+                setDados((anterior) => ({
+                    ...anterior,
+                    registro: salvo,
+                }));
+                setMensagem('Horários salvos');
+            } else {
+                const meta = await atualizarMetaSono(min, max);
+                if (!vivo.current) return;
+                setDados((anterior) => ({
+                    ...anterior,
+                    meta,
+                }));
+                setMensagem('Meta atualizada');
+            }
+            setErro('');
+            setModalAberto(false);
+        } catch (falha) {
+            if (!vivo.current) return;
+            if (falha.response?.data?.codigo === 'DIA_ALTERADO') {
+                try {
+                    const atual = await buscarSono();
+                    if (!vivo.current) return;
+                    setDados(atual);
+                    setDiaEdicao(atual.hoje);
+                    setErro('');
+                    setErroForm('O dia mudou. Confira a nova data e salve novamente.');
+                } catch {
+                    if (vivo.current) {
+                        setErro('Não foi possível atualizar a data. Verifique a conexão e tente novamente.');
+                        setErroForm(
+                            'O dia mudou e não foi possível atualizar a data. Feche e tente carregar novamente.'
+                        );
+                    }
+                }
+            } else {
+                setErroForm('Não foi possível salvar. Seus ajustes continuam aqui para tentar novamente.');
+            }
+        } finally {
+            gravando.current = false;
+            if (vivo.current) setSalvando(false);
+        }
+    };
+    return (
+        <LinearGradient colors={DEGRADES.fundo} style={styles.container}>
+            <AreaDaTela>
+                <View style={styles.limite}>
+                    <Cabecalho titulo="Sono" navigation={navigation} />
+                    <ScrollView
+                        style={styles.conteudo}
+                        contentContainerStyle={styles.conteudoInterno}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        {carregando ? (
+                            <View style={styles.estado}>
+                                <ActivityIndicator size="large" color="#29491A" />
+                                <Text style={styles.estadoTexto}>Carregando seu sono...</Text>
+                            </View>
+                        ) : erro ? (
+                            <View style={styles.estado}>
+                                <Ionicons name="cloud-offline-outline" size={42} color="#42622B" />
+                                <Text style={styles.estadoTitulo}>Vamos tentar de novo?</Text>
+                                <Text style={styles.estadoTexto} accessibilityRole="alert">
+                                    {erro}
+                                </Text>
+                                <Botao
+                                    onPress={() => {
+                                        setCarregando(true);
+                                        carregar();
+                                    }}
+                                >
+                                    Tentar novamente
+                                </Botao>
+                            </View>
+                        ) : (
+                            dados && (
+                                <>
+                                    <LinearGradient colors={DEGRADES.cartao} style={styles.hero}>
+                                        <View style={styles.heroTopo}>
+                                            <View>
+                                                <Text style={styles.sobrancelha}>SEU DESCANSO</Text>
+                                                <Text style={styles.data}>
+                                                    Hoje · {dataCurta(dados.hoje)}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.lua}>
+                                                <Ionicons name="moon" size={56} color={CORES.acento} />
+                                            </View>
+                                        </View>
+                                        <Text style={[styles.duracao, !registro && styles.duracaoVazia]}>
+                                            {registro ? formatarDuracao(duracao) : 'Como foi sua noite?'}
+                                        </Text>
+                                        <Text style={styles.heroSub}>
+                                            {registro
+                                                ? 'Tempo entre dormir e acordar'
+                                                : 'Registre seus horários para acompanhar seu sono.'}
+                                        </Text>
+                                        <View
+                                            style={[
+                                                styles.status,
+                                                {
+                                                    backgroundColor: status.cor,
+                                                },
+                                            ]}
+                                        >
+                                            <Ionicons name={status.icone} size={17} color="#29451E" />
+                                            <Text style={styles.statusTexto}>{status.texto}</Text>
+                                        </View>
+                                        {mensagem ? (
+                                            <View style={styles.confirmacao} accessibilityLiveRegion="polite">
+                                                <Ionicons
+                                                    name="checkmark-circle"
+                                                    size={18}
+                                                    color={CORES.acento}
+                                                />
+                                                <Text style={styles.confirmacaoTexto}>{mensagem}</Text>
+                                            </View>
+                                        ) : null}
+                                    </LinearGradient>
 
-              <Text style={styles.modalTitle}>
-                {editType === 'sleep'
-                  ? 'Fui dormir às:'
-                  : 'Acordei às:'}
-              </Text>
+                                    <View style={styles.secaoTitulo}>
+                                        <Text style={styles.titulo}>Seus horários</Text>
+                                        <TouchableOpacity
+                                            onPress={() => abrir('horarios')}
+                                            style={styles.linkBotao}
+                                            accessibilityRole="button"
+                                            accessibilityLabel="Editar horários de sono"
+                                        >
+                                            <Ionicons name="create-outline" size={17} color="#29491A" />
+                                            <Text style={styles.linkTexto}>
+                                                {registro ? 'Editar' : 'Registrar'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <View style={styles.horarios}>
+                                        {[
+                                            ['moon-outline', 'Fui dormir às', registro?.sleepTime],
+                                            ['sunny-outline', 'Acordei às', registro?.wakeTime],
+                                        ].map(([icone, label, valor], indice) => (
+                                            <TouchableOpacity
+                                                key={label}
+                                                onPress={() => abrir('horarios')}
+                                                style={styles.horarioToque}
+                                                accessibilityRole="button"
+                                                accessibilityLabel={
+                                                    label +
+                                                    ' ' +
+                                                    (valor || 'não registrado') +
+                                                    '. Editar horários'
+                                                }
+                                            >
+                                                <LinearGradient
+                                                    colors={
+                                                        indice === 0
+                                                            ? DEGRADES.cartaoProfundo
+                                                            : DEGRADES.cartaoMedio
+                                                    }
+                                                    style={styles.horarioCard}
+                                                >
+                                                    <Ionicons
+                                                        name={icone}
+                                                        size={25}
+                                                        color={indice === 0 ? CORES.icone : '#FFD83D'}
+                                                    />
+                                                    <Text style={styles.horarioLabel}>{label}</Text>
+                                                    <Text style={styles.horarioValor}>
+                                                        {valor || '— : —'}
+                                                    </Text>
+                                                </LinearGradient>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                    {!registro && (
+                                        <Botao onPress={() => abrir('horarios')}>Registrar minha noite</Botao>
+                                    )}
 
-              <Text style={styles.modalSubtitle}>
-                Informe o horário no formato HH:MM.
-              </Text>
-
-              <TextInput
-                style={styles.modalInput}
-                value={tempTime}
-                onChangeText={setTempTime}
-                placeholder="HH:MM"
-                placeholderTextColor="#999"
-                keyboardType="numbers-and-punctuation"
-                maxLength={5}
-                autoCapitalize="none"
-                accessibilityLabel="Horário no formato horas e minutos"
-              />
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.modalCancel}
-                  onPress={() => {
-                    setModalVisible(false);
-                    setEditType(null);
-                  }}
-                  disabled={saving}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.modalCancelText}>
-                    Cancelar
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.modalSave,
-                    saving && styles.disabledButton,
-                  ]}
-                  onPress={handleSaveTime}
-                  disabled={saving}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.modalSaveText}>
-                    {saving ? 'Salvando...' : 'Salvar'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      </SafeAreaView>
-    </LinearGradient>
-  );
+                                    <LinearGradient colors={DEGRADES.cartaoProfundo} style={styles.metaCard}>
+                                        <View style={styles.metaTopo}>
+                                            <View style={styles.metaTituloGrupo}>
+                                                <Ionicons
+                                                    name="flag-outline"
+                                                    size={21}
+                                                    color={CORES.acento}
+                                                />
+                                                <Text style={[styles.titulo, styles.tituloNoCartao]}>
+                                                    Sua meta diária
+                                                </Text>
+                                            </View>
+                                            <TouchableOpacity
+                                                onPress={() => abrir('meta')}
+                                                style={styles.linkBotao}
+                                                accessibilityRole="button"
+                                                accessibilityLabel="Ajustar meta de sono"
+                                            >
+                                                <Text style={[styles.linkTexto, styles.linkTextoNoCartao]}>
+                                                    Ajustar
+                                                </Text>
+                                                <Ionicons
+                                                    name="chevron-forward"
+                                                    size={16}
+                                                    color={CORES.acento}
+                                                />
+                                            </TouchableOpacity>
+                                        </View>
+                                        <Text style={styles.metaValor}>
+                                            {dados.meta.min === dados.meta.max
+                                                ? dados.meta.min + ' horas'
+                                                : dados.meta.min + ' a ' + dados.meta.max + ' horas'}
+                                        </Text>
+                                        <View
+                                            style={styles.barra}
+                                            accessibilityRole="progressbar"
+                                            accessibilityLabel="Progresso da meta mínima de sono"
+                                            aria-valuemin={0}
+                                            aria-valuemax={100}
+                                            aria-valuenow={status.progresso}
+                                            aria-valuetext={status.progresso + '% da meta mínima de sono'}
+                                        >
+                                            <View
+                                                style={[
+                                                    styles.barraPreenchida,
+                                                    {
+                                                        width: status.progresso + '%',
+                                                    },
+                                                ]}
+                                            />
+                                        </View>
+                                        <View style={styles.metaRodape}>
+                                            <Text style={styles.metaLegenda}>
+                                                {status.progresso}% da meta mínima
+                                            </Text>
+                                            <Text style={styles.metaLegenda}>{dados.meta.min}h</Text>
+                                        </View>
+                                        <Text style={styles.nota}>
+                                            Acompanhe seu ritmo, uma noite de cada vez.
+                                        </Text>
+                                    </LinearGradient>
+                                </>
+                            )
+                        )}
+                    </ScrollView>
+                    <NavegacaoInferior navigation={navigation} ativa="Sono" />
+                </View>
+                <Modal visible={modalAberto} transparent animationType="slide" onRequestClose={fecharModal}>
+                    <View style={styles.fundoModal}>
+                        <View style={styles.modal} accessibilityViewIsModal>
+                            <ScrollView
+                                contentContainerStyle={styles.modalConteudo}
+                                keyboardShouldPersistTaps="handled"
+                            >
+                                <View style={styles.modalTopo}>
+                                    <View style={styles.modalIcone}>
+                                        <Ionicons
+                                            name={modal === 'meta' ? 'flag-outline' : 'moon-outline'}
+                                            size={23}
+                                            color="#3B6124"
+                                        />
+                                    </View>
+                                    <TouchableOpacity
+                                        onPress={fecharModal}
+                                        disabled={salvando}
+                                        style={styles.fechar}
+                                        accessibilityRole="button"
+                                        accessibilityLabel="Fechar edição"
+                                    >
+                                        <Ionicons name="close" size={24} color="#4B6042" />
+                                    </TouchableOpacity>
+                                </View>
+                                <Text style={styles.modalTitulo}>
+                                    {modal === 'meta' ? 'Uma meta para você' : 'Como foi sua noite?'}
+                                </Text>
+                                <Text style={styles.modalDescricao}>
+                                    {modal === 'meta'
+                                        ? 'Escolha a faixa de horas que deseja acompanhar todos os dias.'
+                                        : 'Registro de ' +
+                                          dataCurta(diaEdicao) +
+                                          '. Informe quando dormiu e acordou.'}
+                                </Text>
+                                {modal === 'horarios' ? (
+                                    <>
+                                        <SeletorHorario
+                                            label="Fui dormir às"
+                                            value={inicio}
+                                            onChange={setInicio}
+                                            disabled={salvando}
+                                        />
+                                        <SeletorHorario
+                                            label="Acordei às"
+                                            value={fim}
+                                            onChange={setFim}
+                                            disabled={salvando}
+                                        />
+                                        <View style={styles.previa}>
+                                            <Ionicons name="time-outline" size={22} color="#456332" />
+                                            <View style={styles.previaTexto}>
+                                                <Text style={styles.labelEscuro}>Tempo de sono</Text>
+                                                <Text style={styles.previaValor}>
+                                                    {formatarDuracao(previa)}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        <Text style={styles.modalAjuda}>
+                                            {inicio && fim && inicio === fim
+                                                ? 'Escolha horários diferentes para calcular a duração.'
+                                                : 'Se acordou em um horário anterior ao de dormir, contamos a passagem da meia-noite.'}
+                                        </Text>
+                                    </>
+                                ) : (
+                                    <>
+                                        <AjusteMeta
+                                            titulo="Mínimo"
+                                            valor={min}
+                                            onChange={setMin}
+                                            minimo={1}
+                                            maximo={max}
+                                            disabled={salvando}
+                                        />
+                                        <AjusteMeta
+                                            titulo="Máximo"
+                                            valor={max}
+                                            onChange={setMax}
+                                            minimo={min}
+                                            maximo={24}
+                                            disabled={salvando}
+                                        />
+                                        <Text style={styles.modalAjuda}>
+                                            O progresso usa o mínimo da sua faixa. A meta fica salva na sua
+                                            conta.
+                                        </Text>
+                                    </>
+                                )}
+                                {erroForm ? (
+                                    <Text style={styles.erroForm} accessibilityRole="alert">
+                                        {erroForm}
+                                    </Text>
+                                ) : null}
+                                <Botao
+                                    onPress={salvar}
+                                    disabled={salvando || (modal === 'horarios' && previa === null)}
+                                >
+                                    {salvando
+                                        ? 'Salvando...'
+                                        : modal === 'meta'
+                                          ? 'Salvar meta'
+                                          : 'Salvar horários'}
+                                </Botao>
+                                <Botao secundario onPress={fecharModal} disabled={salvando}>
+                                    Cancelar
+                                </Botao>
+                            </ScrollView>
+                        </View>
+                    </View>
+                </Modal>
+            </AreaDaTela>
+        </LinearGradient>
+    );
 }
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-
-  safeArea: {
-    flex: 1,
-  },
-
-  headerBox: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 8,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderRadius: 30,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFF',
-    letterSpacing: 0.5,
-  },
-
-  content: {
-    flex: 1,
-  },
-
-  contentContainer: {
-    flexGrow: 1,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 18,
-    justifyContent: 'space-evenly',
-    gap: 12,
-  },
-
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-
-  loadingText: {
-    color: '#274804',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  cardMain: {
-    backgroundColor: '#2B4808',
-    borderRadius: 24,
-    paddingVertical: 20,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-  },
-
-  moonCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#436B09',
-    borderWidth: 1,
-    borderColor: 'rgba(214,255,85,0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-
-  sleepTimeText: {
-    fontSize: 34,
-    fontWeight: '900',
-    color: '#FFF',
-    letterSpacing: 0.5,
-  },
-
-  sleepTimeSub: {
-    fontSize: 14,
-    color: '#E0F0C0',
-    marginBottom: 14,
-    marginTop: 2,
-  },
-
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-  },
-
-  statusBadgeText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 13,
-  },
-
-  cardMeta: {
-    backgroundColor: '#2B4808',
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    elevation: 3,
-  },
-
-  metaHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-
-  metaTitle: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: '#FFF',
-  },
-
-  metaSubtitle: {
-    fontSize: 12,
-    color: '#E0F0C0',
-    marginTop: 4,
-  },
-
-  metaIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
-    backgroundColor: 'rgba(214,255,85,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(214,255,85,0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  progressBackground: {
-    height: 12,
-    backgroundColor: '#1A2E03',
-    borderRadius: 7,
-    overflow: 'hidden',
-  },
-
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#C8FF00',
-    borderRadius: 7,
-  },
-
-  progressLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-
-  progressText: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.65)',
-  },
-
-  progressPercent: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#D6FF55',
-  },
-
-  cardTimes: {
-    backgroundColor: '#2B4808',
-    borderRadius: 20,
-    paddingVertical: 18,
-    paddingHorizontal: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    elevation: 3,
-  },
-
-  timeColumn: {
-    flex: 1,
-    alignItems: 'center',
-  },
-
-  timeIconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
-    backgroundColor: 'rgba(214,255,85,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(214,255,85,0.22)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-
-  divider: {
-    width: 1,
-    height: 112,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginHorizontal: 6,
-  },
-
-  timeLabel: {
-    fontSize: 12,
-    color: '#E0F0C0',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-
-  timeValue: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#FFF',
-    marginVertical: 8,
-  },
-
-  editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#436B09',
-    borderWidth: 1,
-    borderColor: 'rgba(214,255,85,0.2)',
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    borderRadius: 14,
-  },
-
-  editIcon: {
-    marginRight: 5,
-  },
-
-  editButtonText: {
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-
-  historyNoteContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-    gap: 6,
-  },
-
-  historyNote: {
-    flexShrink: 1,
-    fontSize: 11,
-    color: '#274804',
-    textAlign: 'center',
-  },
-
-  bottomNavbar: {
-    borderRadius: 30,
-    height: 62,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-
-  navItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    height: '100%',
-  },
-
-  activeCircleIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#C8FF00',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#C8FF00',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-
-  modalContent: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: '#2B4808',
-    borderRadius: 24,
-    padding: 24,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(214,255,85,0.25)',
-    elevation: 10,
-  },
-
-  modalIconCircle: {
-    width: 58,
-    height: 58,
-    borderRadius: 20,
-    backgroundColor: 'rgba(214,255,85,0.10)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-
-  modalTitle: {
-    fontSize: 19,
-    fontWeight: '900',
-    color: '#FFF',
-    marginBottom: 6,
-  },
-
-  modalSubtitle: {
-    fontSize: 13,
-    color: '#D5E7BB',
-    textAlign: 'center',
-    marginBottom: 18,
-  },
-
-  modalInput: {
-    backgroundColor: '#1A2E03',
-    color: '#FFF',
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    width: '100%',
-    paddingVertical: 12,
-    borderRadius: 14,
-    marginBottom: 22,
-    borderWidth: 1,
-    borderColor: 'rgba(214,255,85,0.2)',
-  },
-
-  modalActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    gap: 12,
-  },
-
-  modalCancel: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-  },
-
-  modalCancelText: {
-    color: '#D5E7BB',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  modalSave: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: '#639818',
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    borderRadius: 14,
-  },
-
-  modalSaveText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-
-  disabledButton: {
-    opacity: 0.6,
-  },
+    container: {
+        flex: 1,
+    },
+    limite: {
+        flex: 1,
+        minHeight: 0,
+    },
+    conteudo: {
+        flex: 1,
+        minHeight: 0,
+        paddingHorizontal: 16,
+    },
+    conteudoInterno: {
+        paddingBottom: 12,
+        gap: 16,
+    },
+    hero: {
+        borderRadius: 30,
+        padding: 24,
+        paddingBottom: 27,
+    },
+    heroTopo: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 12,
+    },
+    sobrancelha: {
+        color: '#C6DCAD',
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 2,
+    },
+    data: {
+        color: '#E1EED1',
+        fontSize: 13,
+        marginTop: 7,
+    },
+    lua: {
+        width: 88,
+        height: 88,
+        borderRadius: 28,
+        backgroundColor: CORES.acento + '1A',
+        borderWidth: 1,
+        borderColor: CORES.acento + '33',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    duracao: {
+        color: '#F4F8E9',
+        fontSize: 52,
+        fontWeight: '700',
+        marginTop: 16,
+        letterSpacing: -1,
+    },
+    duracaoVazia: {
+        fontSize: 29,
+        letterSpacing: -0.5,
+    },
+    heroSub: {
+        color: '#D0DDBF',
+        fontSize: 14,
+        lineHeight: 21,
+        marginTop: 5,
+    },
+    status: {
+        alignSelf: 'flex-start',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 7,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        marginTop: 21,
+    },
+    statusTexto: {
+        color: '#29451E',
+        fontSize: 12,
+        fontWeight: '700',
+        flexShrink: 1,
+    },
+    confirmacao: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 7,
+        marginTop: 15,
+    },
+    confirmacaoTexto: {
+        color: '#EDFFD7',
+        fontSize: 13,
+    },
+    secaoTitulo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 4,
+    },
+    titulo: {
+        color: '#293F1B',
+        fontSize: 17,
+        fontWeight: '700',
+        flexShrink: 1,
+    },
+    tituloNoCartao: {
+        color: '#F4F8E9',
+    },
+    linkBotao: {
+        minHeight: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 5,
+    },
+    linkTexto: {
+        color: '#29491A',
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    linkTextoNoCartao: {
+        color: CORES.acento,
+    },
+    horarios: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    horarioToque: {
+        flex: 1,
+    },
+    horarioCard: {
+        flex: 1,
+        borderRadius: 23,
+        padding: 19,
+        borderWidth: 1,
+        borderColor: CORES.icone + '33',
+    },
+    horarioLabel: {
+        fontSize: 13,
+        color: CORES.textoSuave,
+        marginTop: 16,
+    },
+    horarioValor: {
+        fontSize: 29,
+        color: '#F4F8E9',
+        fontWeight: '700',
+        marginTop: 6,
+    },
+    metaCard: {
+        borderRadius: 25,
+        padding: 21,
+        borderWidth: 1,
+        borderColor: CORES.icone + '33',
+    },
+    metaTopo: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 8,
+    },
+    metaTituloGrupo: {
+        flexDirection: 'row',
+        gap: 9,
+        alignItems: 'center',
+        flex: 1,
+    },
+    metaValor: {
+        color: '#F4F8E9',
+        fontSize: 25,
+        fontWeight: '700',
+        marginTop: 14,
+    },
+    barra: {
+        height: 9,
+        borderRadius: 10,
+        backgroundColor: '#FFFFFF1A',
+        overflow: 'hidden',
+        marginTop: 19,
+    },
+    barraPreenchida: {
+        height: '100%',
+        backgroundColor: CORES.acento,
+        borderRadius: 10,
+    },
+    metaRodape: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 9,
+    },
+    metaLegenda: {
+        color: CORES.textoSuave,
+        fontSize: 12,
+    },
+    nota: {
+        color: '#B7CAA4',
+        fontSize: 12,
+        lineHeight: 18,
+        marginTop: 20,
+    },
+    estado: {
+        padding: 25,
+        paddingVertical: 70,
+        alignItems: 'center',
+        gap: 18,
+    },
+    estadoTitulo: {
+        fontSize: 23,
+        fontWeight: '700',
+        color: '#29491A',
+    },
+    estadoTexto: {
+        textAlign: 'center',
+        color: '#42582F',
+        fontSize: 15,
+        lineHeight: 23,
+    },
+    botao: {
+        backgroundColor: '#29491A',
+        borderRadius: 18,
+        minHeight: 52,
+        padding: 15,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    botaoTexto: {
+        color: '#F4FFE3',
+        fontWeight: '700',
+        fontSize: 15,
+    },
+    botaoSecundario: {
+        backgroundColor: '#EEF3E5',
+    },
+    botaoTextoSecundario: {
+        color: '#405B2E',
+    },
+    desabilitado: {
+        opacity: 0.45,
+    },
+    fundoModal: {
+        flex: 1,
+        backgroundColor: '#14210DC0',
+        justifyContent: 'center',
+        padding: 18,
+    },
+    modal: {
+        width: '100%',
+        maxWidth: 470,
+        maxHeight: '94%',
+        alignSelf: 'center',
+        borderRadius: 28,
+        backgroundColor: '#FCFDF7',
+        overflow: 'hidden',
+    },
+    modalConteudo: {
+        padding: 24,
+        gap: 16,
+    },
+    modalTopo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    modalIcone: {
+        width: 45,
+        height: 45,
+        borderRadius: 16,
+        backgroundColor: '#E9F1DB',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    fechar: {
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modalTitulo: {
+        color: '#29451E',
+        fontSize: 26,
+        fontWeight: '700',
+    },
+    modalDescricao: {
+        color: '#5E7052',
+        fontSize: 14,
+        lineHeight: 21,
+    },
+    labelEscuro: {
+        color: '#4D6041',
+        fontSize: 14,
+    },
+    previa: {
+        padding: 16,
+        borderRadius: 17,
+        backgroundColor: '#EAF2DC',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    previaTexto: {
+        flex: 1,
+    },
+    previaValor: {
+        color: '#29451E',
+        fontSize: 23,
+        fontWeight: '700',
+        marginTop: 3,
+    },
+    modalAjuda: {
+        color: '#67785A',
+        fontSize: 12,
+        lineHeight: 19,
+    },
+    erroForm: {
+        color: '#913D28',
+        backgroundColor: '#FFF0E9',
+        padding: 12,
+        borderRadius: 12,
+        fontSize: 13,
+        lineHeight: 20,
+    },
+    ajusteMeta: {
+        padding: 16,
+        borderRadius: 18,
+        backgroundColor: '#F0F5E6',
+        gap: 12,
+    },
+    ajusteControles: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    ajusteBotao: {
+        width: 44,
+        height: 44,
+        backgroundColor: '#FCFDF7',
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    ajusteValor: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: '#29451E',
+    },
 });

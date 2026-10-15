@@ -1,9 +1,10 @@
+import { criarEstilos } from '../theme/estilos';
 import React, { useEffect, useRef, useState } from 'react';
 import {
+    Platform,
     View,
     Text,
     TouchableOpacity,
-    StyleSheet,
     ScrollView,
     Animated,
     Easing,
@@ -81,7 +82,7 @@ export default function EmocaoScreen({ navigation }) {
             toValue: 1,
             duration: CONFIRMATION_DURATION,
             easing: Easing.linear,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
             isInteraction: false,
         });
 
@@ -99,13 +100,13 @@ export default function EmocaoScreen({ navigation }) {
                     toValue: 1.06,
                     duration: 1400,
                     easing: Easing.inOut(Easing.ease),
-                    useNativeDriver: true,
+                    useNativeDriver: Platform.OS !== 'web',
                 }),
                 Animated.timing(iconPulse, {
                     toValue: 1,
                     duration: 1400,
                     easing: Easing.inOut(Easing.ease),
-                    useNativeDriver: true,
+                    useNativeDriver: Platform.OS !== 'web',
                 }),
             ])
         );
@@ -247,7 +248,6 @@ export default function EmocaoScreen({ navigation }) {
 
                         {confirmation > 0 && (
                             <Animated.View
-                                pointerEvents="none"
                                 accessible
                                 accessibilityRole="alert"
                                 accessibilityLabel="Sentimento registrado com sucesso"
@@ -419,7 +419,7 @@ export default function EmocaoScreen({ navigation }) {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = criarEstilos({
     container: {
         flex: 1,
     },
@@ -561,6 +561,7 @@ const styles = StyleSheet.create({
     },
 
     confirmation: {
+        pointerEvents: 'none',
         position: 'absolute',
         top: 40,
         right: 20,

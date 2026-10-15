@@ -20,7 +20,6 @@ import GraficoScreen from "./src/screens/Grafico";
 import PerfilScreen from "./src/screens/Perfil";
 
 LogBox.ignoreLogs([
-    "Animated: `useNativeDriver`",
     "EventEmitter.removeListener",
 ]);
 
