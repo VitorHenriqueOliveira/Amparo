@@ -1,13 +1,12 @@
 import { criarEstilos } from '../theme/estilos';
 import { AreaDaTela, Cabecalho, NavegacaoInferior } from '../components/NavegacaoPadrao';
 import { CORES, DEGRADES } from '../theme/tema';
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Platform, View, Text, TouchableOpacity, ScrollView, Animated, Easing, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { adicionarEmocao } from '../storage/registros';
-import { AuthContext } from '../contexts/AuthContext';
+import { adicionarEmocao, criarIdConfirmacao } from '../services/emocoes';
 const CONFIRMATION_DURATION = 1100;
 const EMOTIONS = {
     feliz: {
@@ -40,12 +39,12 @@ const EMOTIONS = {
     },
 };
 export default function EmocaoScreen({ navigation }) {
-    const { usuario } = useContext(AuthContext);
     const [selectedEmotionKey, setSelectedEmotionKey] = useState(null);
     const [saving, setSaving] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [confirmation, setConfirmation] = useState(0);
     const savingRef = useRef(false);
+    const pendingConfirmation = useRef(null);
     const iconPulse = useRef(new Animated.Value(1)).current;
     const confirmationProgress = useRef(new Animated.Value(0)).current;
     useEffect(() => {
@@ -93,11 +92,18 @@ export default function EmocaoScreen({ navigation }) {
         setSaving(true);
         setErrorMessage('');
         try {
-            await adicionarEmocao(usuario.id_usuario, selectedEmotion.id, selectedEmotion.title);
+            if (pendingConfirmation.current?.emotionKey !== selectedEmotion.id) {
+                pendingConfirmation.current = {
+                    emotionKey: selectedEmotion.id,
+                    idCliente: criarIdConfirmacao(),
+                };
+            }
+            await adicionarEmocao(selectedEmotion.id, pendingConfirmation.current.idCliente);
+            pendingConfirmation.current = null;
             setSelectedEmotionKey(null);
             setConfirmation((current) => current + 1);
         } catch {
-            setErrorMessage('Não foi possível salvar a emoção. Tente novamente.');
+            setErrorMessage('Não foi possível salvar a emoção. Verifique sua conexão e tente novamente.');
         } finally {
             savingRef.current = false;
             setSaving(false);
@@ -107,6 +113,7 @@ export default function EmocaoScreen({ navigation }) {
         if (savingRef.current) return;
         setSelectedEmotionKey(null);
         setErrorMessage('');
+        pendingConfirmation.current = null;
     };
     const handleNavigation = (route) => {
         navigation.navigate(route);

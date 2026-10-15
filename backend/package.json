@@ -5,7 +5,10 @@
     "main": "index.js",
     "type": "module",
     "scripts": {
-        "test": "node --experimental-vm-modules --test tests/*.test.cjs"
+        "test": "node --experimental-vm-modules --test tests/*.test.cjs",
+        "db:audit": "node scripts/auditar-banco.js",
+        "db:check": "node scripts/migrar-banco.js",
+        "db:migrate": "node scripts/migrar-banco.js --apply"
     },
     "keywords": [],
     "author": "",
@@ -19,5 +22,8 @@
         "express-rate-limit": "^8.7.1",
         "helmet": "^8.3.0",
         "jsonwebtoken": "^9.0.3"
+    },
+    "devDependencies": {
+        "@electric-sql/pglite": "^0.5.10"
     }
 }

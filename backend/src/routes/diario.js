@@ -3,7 +3,7 @@ import sql from '../db.js';
 import verificarToken from '../middlewares/auth.js';
 
 const router = express.Router();
-router.use(verificarToken);
+router.use('/diario', verificarToken);
 
 function idValido(valor) {
     return /^\d+$/.test(String(valor)) && Number.isSafeInteger(Number(valor)) && Number(valor) > 0;

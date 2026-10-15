@@ -17,10 +17,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path, Circle } from 'react-native-svg';
 
 import {
-    listarEmocoes,
     listarSono,
 } from '../storage/registros';
 import { listarDiario } from '../services/diario';
+import { listarEmocoes } from '../services/emocoes';
 import { AuthContext } from '../contexts/AuthContext';
 
 const EMOCOES = {
@@ -417,7 +417,7 @@ export default function GraficoScreen({ navigation }) {
 
                 try {
                     const [emocoes, diario, sono] = await Promise.all([
-                        listarEmocoes(idUsuario),
+                        listarEmocoes(),
                         listarDiario(idUsuario),
                         listarSono(idUsuario),
                     ]);
