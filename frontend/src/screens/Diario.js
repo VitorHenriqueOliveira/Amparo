@@ -1,10 +1,10 @@
+import { criarEstilos } from '../theme/estilos';
 import React, { useCallback, useState, useContext } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   FlatList,
   Alert,
   KeyboardAvoidingView,
@@ -469,7 +469,7 @@ export default function DiarioScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = criarEstilos({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   keyboardView: { flex: 1 },

@@ -1,8 +1,8 @@
+import { criarEstilos } from '../theme/estilos';
 import React, { useState, useContext } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   StatusBar,
   ScrollView,
   TouchableOpacity,
@@ -417,7 +417,7 @@ export default function Perfil({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = criarEstilos({
   container: {
     flex: 1,
   },

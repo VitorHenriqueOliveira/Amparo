@@ -1,10 +1,10 @@
+import { criarEstilos } from '../theme/estilos';
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import {
     View,
     Text,
     TextInput,
     TouchableOpacity,
-    StyleSheet,
     Animated,
     Easing,
     Alert,
@@ -60,25 +60,25 @@ export default function LoginScreen({ navigation }) {
                         toValue: 1.12,
                         duration: 1500,
                         easing: Easing.inOut(Easing.ease),
-                        useNativeDriver: true,
+                        useNativeDriver: Platform.OS !== 'web',
                     }),
                     Animated.timing(sunScale, {
                         toValue: 1,
                         duration: 1500,
                         easing: Easing.inOut(Easing.ease),
-                        useNativeDriver: true,
+                        useNativeDriver: Platform.OS !== 'web',
                     }),
                 ]),
                 Animated.sequence([
                     Animated.timing(sunGlow, {
                         toValue: 1,
                         duration: 1500,
-                        useNativeDriver: true,
+                        useNativeDriver: Platform.OS !== 'web',
                     }),
                     Animated.timing(sunGlow, {
                         toValue: 0.55,
                         duration: 1500,
-                        useNativeDriver: true,
+                        useNativeDriver: Platform.OS !== 'web',
                     }),
                 ]),
             ])
@@ -243,7 +243,7 @@ export default function LoginScreen({ navigation }) {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = criarEstilos({
     container: {
         flex: 1,
     },

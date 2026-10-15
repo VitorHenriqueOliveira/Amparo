@@ -6,6 +6,7 @@ import rotasUsuario from './routes/usuario.js';
 import rotasDiario from './routes/diario.js';
 import rotasCalma from './routes/calma.js';
 import rotasEmocoes from './routes/emocoes.js';
+import rotasSono from './routes/sono.js';
 
 // Separa a configuração da API da abertura da porta para permitir testes.
 export function criarApp({ origensPermitidas, proxiesConfiaveis = 0 }) {
@@ -59,6 +60,7 @@ export function criarApp({ origensPermitidas, proxiesConfiaveis = 0 }) {
     app.use('/api', rotasUsuario);
     app.use('/api', rotasCalma);
     app.use('/api', rotasEmocoes);
+    app.use('/api', rotasSono);
     app.use('/api', rotasDiario);
 
     app.use((req, res) => {

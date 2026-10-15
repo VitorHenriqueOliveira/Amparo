@@ -1,0 +1,2 @@
+# Os espaços nas linhas de contexto fazem parte do formato dos patches.
+*.patch -whitespace

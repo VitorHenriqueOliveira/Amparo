@@ -1,10 +1,10 @@
+import { criarEstilos } from '../theme/estilos';
 import React, { useCallback, useMemo, useState, useContext } from 'react';
 
 import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,7 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path, Circle } from 'react-native-svg';
 
-import { listarSono, listarEmocoes as listarEmocoesLocais } from '../storage/registros';
+import { listarEmocoes as listarEmocoesLocais } from '../storage/registros';
+import { listarSono } from '../services/sono';
 import { listarEmocoes } from '../services/emocoes';
 import { listarDiario } from '../services/diario';
 import { AuthContext } from '../contexts/AuthContext';
@@ -913,7 +914,7 @@ export default function GraficoScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = criarEstilos({
   container: {
     flex: 1,
   },

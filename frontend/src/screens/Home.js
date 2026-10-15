@@ -1,11 +1,12 @@
+import { criarEstilos } from '../theme/estilos';
 import React, { useEffect, useRef } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-  Easing,
+    Platform,
+    View,
+    Text,
+    TouchableOpacity,
+    Animated,
+    Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -24,25 +25,25 @@ export default function HomeScreen({ navigation }) {
             toValue: 1.12,
             duration: 1500,
             easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
           Animated.timing(sunScale, {
             toValue: 1,
             duration: 1500,
             easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
         ]),
         Animated.sequence([
           Animated.timing(sunGlow, {
             toValue: 1,
             duration: 1500,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
           Animated.timing(sunGlow, {
             toValue: 0.55,
             duration: 1500,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
         ]),
       ])
@@ -201,7 +202,7 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = criarEstilos({
   container: {
     flex: 1,
   },

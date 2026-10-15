@@ -1,6 +1,7 @@
+import { criarEstilos } from '../theme/estilos';
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    View, Text, TouchableOpacity, StyleSheet, Animated, Easing,
+    View, Text, TouchableOpacity, Animated, Easing,
     AppState, AccessibilityInfo, ScrollView, Modal, FlatList, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -450,7 +451,7 @@ export default function ModoCalmaScreen({ navigation }) {
     );
 }
 
-const styles = StyleSheet.create({
+const styles = criarEstilos({
     container: {
         flex: 1,
     },
