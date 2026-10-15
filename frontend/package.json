@@ -39,7 +39,8 @@
     },
     "devDependencies": {
         "@types/react": "~19.2.2",
-        "typescript": "~6.0.3"
+        "typescript": "~6.0.3",
+        "patch-package": "^8.0.1"
     },
     "overrides": {
         "metro@0.84.4": {
@@ -55,7 +56,8 @@
         "ios": "expo start --ios",
         "web": "expo start --web",
         "lint": "expo lint",
-        "test": "node --experimental-vm-modules --test tests/*.test.cjs"
+        "test": "node --experimental-vm-modules --test tests/*.test.cjs",
+        "postinstall": "patch-package --error-on-fail"
     },
     "private": true
 }

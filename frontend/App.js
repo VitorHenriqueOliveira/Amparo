@@ -20,7 +20,6 @@ import GraficoScreen from "./src/screens/Grafico";
 import PerfilScreen from "./src/screens/Perfil";
 
 LogBox.ignoreLogs([
-    "Animated: `useNativeDriver`",
     "EventEmitter.removeListener",
 ]);
 
@@ -32,6 +31,7 @@ function MainTabs() {
     return (
         <Tab.Navigator
             initialRouteName="Home"
+            backBehavior="history"
             screenOptions={{
                 headerShown: false,
                 tabBarStyle: { display: "none" },
