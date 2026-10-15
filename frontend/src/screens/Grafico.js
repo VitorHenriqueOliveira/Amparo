@@ -16,9 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path, Circle } from 'react-native-svg';
 
-import {
-    listarSono,
-} from '../storage/registros';
+import { listarSono } from '../services/sono';
 import { listarDiario } from '../services/diario';
 import { listarEmocoes } from '../services/emocoes';
 import { AuthContext } from '../contexts/AuthContext';

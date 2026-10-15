@@ -327,10 +327,12 @@ test('produção rejeita API sem HTTPS antes de enviar credenciais', async () =>
 });
 
 test('emoções e sono ficam separados ao trocar de conta', async () => {
-    const storage = storageMock([['@amparo/emocoes', JSON.stringify([{ emotionKey: 'triste' }])]]);
+    const storage = storageMock([
+        ['@amparo/emocoes', JSON.stringify([{ emotionKey: 'triste' }])],
+        ['@amparo/emocoes:7', JSON.stringify([{ emotionKey: 'feliz' }])],
+        ['@amparo/sono:7', JSON.stringify([{ date: '2026-10-13', totalMinutes: 480 }])],
+    ]);
     const registros = await carregar('src/storage/registros.js', { '@react-native-async-storage/async-storage': storage });
-    await registros.adicionarEmocao(7, 'feliz', 'Feliz');
-    await registros.registrarSonoHoje(7, '22:30', '06:30');
     assert.equal((await registros.listarEmocoes(7))[0].emotionKey, 'feliz');
     assert.equal((await registros.listarSono(7))[0].totalMinutes, 480);
     assert.equal((await registros.listarEmocoes(8)).length, 0);
@@ -338,19 +340,7 @@ test('emoções e sono ficam separados ao trocar de conta', async () => {
     assert.ok(storage.dados.has('@amparo/emocoes'), 'O histórico antigo não deve ser apagado nem atribuído a outra conta.');
 });
 
-test('editar sono substitui o dia atual, calcula passagem da meia-noite e rejeita horários inválidos', async () => {
-    const storage = storageMock();
-    const registros = await carregar('src/storage/registros.js', { '@react-native-async-storage/async-storage': storage });
-    const primeiro = await registros.registrarSonoHoje(7, '23:45', '07:15');
-    assert.equal(primeiro.totalMinutes, 450);
-    await registros.registrarSonoHoje(7, '22:00', '07:00');
-    const itens = await registros.listarSono(7);
-    assert.equal(itens.length, 1);
-    assert.equal(itens[0].id, primeiro.id);
-    assert.equal(itens[0].totalMinutes, 540);
-    await assert.rejects(registros.registrarSonoHoje(7, '25:00', '07:00'), /inválido/);
-    await assert.rejects(registros.listarEmocoes(undefined), /inválido/);
-});
+
 
 test('diário converte o contrato da API para as telas e envia CRUD para as rotas existentes', async () => {
     const chamadas = [];

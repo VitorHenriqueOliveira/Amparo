@@ -32,19 +32,3 @@ export async function adicionarEmocao(idUsuario, emotionKey, emotionTitle) {
 export function listarSono(idUsuario) {
   return lerLista('sono', idUsuario);
 }
-
-export async function registrarSonoHoje(idUsuario, sleepTime, wakeTime) {
-  const formato = /^([01]\d|2[0-3]):[0-5]\d$/;
-  if (!formato.test(sleepTime) || !formato.test(wakeTime)) throw new Error('Horário inválido.');
-  const registros = await listarSono(idUsuario);
-  const hoje = new Date();
-  const data = [hoje.getFullYear(), String(hoje.getMonth() + 1).padStart(2, '0'), String(hoje.getDate()).padStart(2, '0')].join('-');
-  const [h1, m1] = sleepTime.split(':').map(Number);
-  const [h2, m2] = wakeTime.split(':').map(Number);
-  let totalMinutes = h2 * 60 + m2 - (h1 * 60 + m1);
-  if (totalMinutes <= 0) totalMinutes += 24 * 60;
-  const existente = registros.find((item) => item.date === data);
-  const registro = { id: existente?.id ?? gerarId(), date: data, sleepTime, wakeTime, totalMinutes };
-  await guardarLista('sono', idUsuario, [...registros.filter((item) => item.date !== data), registro]);
-  return registro;
-}
