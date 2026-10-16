@@ -57,7 +57,7 @@ function storageMock(inicial = []) {
     };
 }
 
-const usuario = { id_usuario: 7, nome: 'Pessoa de teste', email: 'teste@example.com' };
+const usuario = { id_usuario: 7, nome: 'Pessoa de teste', email: 'teste@example.com', st_notificacao: true };
 
 function tokenTeste(id = 7, exp = Math.floor(Date.now() / 1000) + 3600) {
     const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
@@ -465,4 +465,32 @@ test('tentativa de reenvio usa o mesmo identificador de confirmação', async ()
     assert.equal((await emocoes.adicionarEmocao('feliz', confirmacao)).id, 42);
     assert.equal(chamadas[0].body.id_cliente, chamadas[1].body.id_cliente);
     await assert.rejects(emocoes.adicionarEmocao('feliz'), /Identificador/);
+});
+
+test('perfil consulta preferências e envia booleanos estritos sem identificar outra conta', async () => {
+    const chamadas = [];
+    const api = {
+        async get(rota) { chamadas.push(['GET', rota]); return { data: { usuario } }; },
+        async put(rota, body) {
+            chamadas.push(['PUT', rota, body]);
+            return { data: { usuario: { ...usuario, st_notificacao: body.st_notificacao } } };
+        },
+    };
+    const perfil = await carregar('src/services/usuario.js', { './api': api });
+    assert.equal((await perfil.buscarPerfil()).id_usuario, 7);
+    for (const valor of [false, true]) {
+        assert.equal((await perfil.atualizarNotificacoes(valor)).st_notificacao, valor);
+    }
+    assert.deepEqual(JSON.parse(JSON.stringify(chamadas)), [
+        ['GET', '/perfil'], ['PUT', '/perfil/notificacoes', { st_notificacao: false }],
+        ['PUT', '/perfil/notificacoes', { st_notificacao: true }],
+    ]);
+    for (const invalido of [null, undefined, 'false', 0, 1, [], {}]) {
+        await assert.rejects(perfil.atualizarNotificacoes(invalido), /válida/);
+    }
+    assert.equal(chamadas.length, 3);
+    api.get = async () => ({ data: { usuario: { ...usuario, st_notificacao: null } } });
+    await assert.rejects(perfil.buscarPerfil(), /perfil/);
+    api.put = async () => { throw new Error('Sem conexão'); };
+    await assert.rejects(perfil.atualizarNotificacoes(false), /conexão/);
 });
