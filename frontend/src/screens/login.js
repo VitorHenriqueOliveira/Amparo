@@ -1,10 +1,11 @@
 import { criarEstilos } from '../theme/estilos';
 import { AreaDaTela, Cabecalho } from '../components/NavegacaoPadrao';
+import ConteudoAjustavel from '../components/ConteudoAjustavel';
 import { CORES, DEGRADES } from '../theme/tema';
 import { useState, useEffect, useRef, useContext } from 'react';
 import {
     View,
-    ScrollView,
+    KeyboardAvoidingView,
     Text,
     TextInput,
     TouchableOpacity,
@@ -13,12 +14,15 @@ import {
     Alert,
     ActivityIndicator,
     Platform,
+    useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
 import { AuthContext } from '../contexts/AuthContext';
 export default function LoginScreen({ navigation }) {
+    const { height } = useWindowDimensions();
+    const compacto = height < 760;
     const [email, setEmail] = useState('');
     const [senha, setSenha] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -95,125 +99,127 @@ export default function LoginScreen({ navigation }) {
                 <Cabecalho titulo="Amparo" navigation={navigation} marca mostrarPerfil={false} />
 
                 {/* ÁREA PRINCIPAL */}
-                <ScrollView
-                    style={styles.regiaoRolavel}
-                    contentContainerStyle={styles.mainContent}
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
+                <KeyboardAvoidingView
+                    style={styles.areaFormulario}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 >
-                    <LinearGradient colors={DEGRADES.cartao} style={styles.loginCard}>
-                        {/* SOL ANIMADO E SAUDAÇÃO */}
-                        <View style={styles.logoContainer}>
-                            <Animated.View
-                                style={[
-                                    styles.sunGlow,
-                                    {
-                                        opacity: sunGlow,
-                                        transform: [
-                                            {
-                                                scale: sunScale,
-                                            },
-                                        ],
-                                    },
-                                ]}
-                            >
-                                <View style={styles.sunInnerGlow}>
-                                    <Ionicons name="sunny" size={96} color="#ffcc00" />
+                    <ConteudoAjustavel contentContainerStyle={styles.mainContent}>
+                        <LinearGradient colors={DEGRADES.cartao} style={styles.loginCard}>
+                            {/* SOL ANIMADO E SAUDAÇÃO */}
+                            <View style={[styles.logoContainer, compacto && styles.logoContainerCompacto]}>
+                                <Animated.View
+                                    style={[
+                                        styles.sunGlow,
+                                        compacto && styles.sunGlowCompacto,
+                                        {
+                                            opacity: sunGlow,
+                                            transform: [
+                                                {
+                                                    scale: sunScale,
+                                                },
+                                            ],
+                                        },
+                                    ]}
+                                >
+                                    <View style={[styles.sunInnerGlow, compacto && styles.sunInnerGlowCompacto]}>
+                                        <Ionicons name="sunny" size={compacto ? 64 : 96} color="#ffcc00" />
+                                    </View>
+                                </Animated.View>
+
+                                <View>
+                                    <Text style={styles.welcomeText}>Bem-vindo</Text>
+                                    <Text style={styles.subtitleText}>Entre na sua conta</Text>
                                 </View>
-                            </Animated.View>
-
-                            <Text style={styles.welcomeText}>Bem-vindo</Text>
-
-                            <Text style={styles.subtitleText}>Entre na sua conta</Text>
-                        </View>
-
-                        {/* FORMULÁRIO */}
-                        <TouchableOpacity
-                            style={styles.calmaButton}
-                            onPress={() => navigation.navigate('CalmaUrgente')}
-                            accessibilityRole="button"
-                            accessibilityLabel="Abrir Calma Urgente sem login"
-                        >
-                            <Ionicons name="leaf-outline" size={22} color="#BBFF00" />
-                            <Text style={styles.calmaButtonText}>Calma Urgente</Text>
-                        </TouchableOpacity>
-
-                        <View style={styles.formContainer}>
-                            {/* EMAIL */}
-                            <View style={styles.inputWrapper}>
-                                <Ionicons
-                                    name="mail-outline"
-                                    size={22}
-                                    color={CORES.acento}
-                                    style={styles.inputIcon}
-                                />
-
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Email"
-                                    placeholderTextColor="#AFC88A"
-                                    value={email}
-                                    onChangeText={setEmail}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                    editable={!isLoading}
-                                />
                             </View>
 
-                            {/* SENHA */}
-                            <View style={styles.inputWrapper}>
-                                <Ionicons
-                                    name="lock-closed-outline"
-                                    size={22}
-                                    color={CORES.acento}
-                                    style={styles.inputIcon}
-                                />
-
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Senha"
-                                    placeholderTextColor="#AFC88A"
-                                    secureTextEntry
-                                    value={senha}
-                                    onChangeText={setSenha}
-                                    editable={!isLoading}
-                                />
-                            </View>
-
-                            {/* ESQUECEU A SENHA */}
-                            <TouchableOpacity style={styles.forgotButton} activeOpacity={0.7}>
-                                <Text style={styles.forgotText}>Esqueceu a senha?</Text>
-                            </TouchableOpacity>
-
-                            {/* BOTÃO ENTRAR */}
+                            {/* FORMULÁRIO */}
                             <TouchableOpacity
-                                style={[
-                                    styles.loginButton,
-                                    isLoading && {
-                                        opacity: 0.7,
-                                    },
-                                ]}
-                                onPress={handleLogin}
-                                disabled={isLoading}
-                                activeOpacity={0.8}
+                                style={styles.calmaButton}
+                                onPress={() => navigation.navigate('CalmaUrgente')}
+                                accessibilityRole="button"
+                                accessibilityLabel="Abrir Calma Urgente sem login"
                             >
-                                {isLoading ? (
-                                    <ActivityIndicator color="#274804" />
-                                ) : (
-                                    <Text style={styles.loginButtonText}>Entrar</Text>
-                                )}
-
-                                <Ionicons name="arrow-forward" size={21} color="#274804" />
+                                <Ionicons name="leaf-outline" size={22} color="#BBFF00" />
+                                <Text style={styles.calmaButtonText}>Calma Urgente</Text>
                             </TouchableOpacity>
-                        </View>
-                    </LinearGradient>
-                </ScrollView>
+
+                            <View style={styles.formContainer}>
+                                {/* EMAIL */}
+                                <View style={styles.inputWrapper}>
+                                    <Ionicons
+                                        name="mail-outline"
+                                        size={22}
+                                        color={CORES.acento}
+                                        style={styles.inputIcon}
+                                    />
+
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Email"
+                                        placeholderTextColor="#AFC88A"
+                                        value={email}
+                                        onChangeText={setEmail}
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                        editable={!isLoading}
+                                    />
+                                </View>
+
+                                {/* SENHA */}
+                                <View style={styles.inputWrapper}>
+                                    <Ionicons
+                                        name="lock-closed-outline"
+                                        size={22}
+                                        color={CORES.acento}
+                                        style={styles.inputIcon}
+                                    />
+
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Senha"
+                                        placeholderTextColor="#AFC88A"
+                                        secureTextEntry
+                                        value={senha}
+                                        onChangeText={setSenha}
+                                        editable={!isLoading}
+                                    />
+                                </View>
+
+                                {/* ESQUECEU A SENHA */}
+                                <TouchableOpacity style={styles.forgotButton} activeOpacity={0.7}>
+                                    <Text style={styles.forgotText}>Esqueceu a senha?</Text>
+                                </TouchableOpacity>
+
+                                {/* BOTÃO ENTRAR */}
+                                <TouchableOpacity
+                                    style={[
+                                        styles.loginButton,
+                                        isLoading && {
+                                            opacity: 0.7,
+                                        },
+                                    ]}
+                                    onPress={handleLogin}
+                                    disabled={isLoading}
+                                    activeOpacity={0.8}
+                                >
+                                    {isLoading ? (
+                                        <ActivityIndicator color="#274804" />
+                                    ) : (
+                                        <Text style={styles.loginButtonText}>Entrar</Text>
+                                    )}
+
+                                    <Ionicons name="arrow-forward" size={21} color="#274804" />
+                                </TouchableOpacity>
+                            </View>
+                        </LinearGradient>
+                    </ConteudoAjustavel>
+                </KeyboardAvoidingView>
             </AreaDaTela>
         </LinearGradient>
     );
 }
 const styles = criarEstilos({
-    regiaoRolavel: {
+    areaFormulario: {
         flex: 1,
         minHeight: 0,
     },
@@ -227,14 +233,14 @@ const styles = criarEstilos({
         flexGrow: 1,
         justifyContent: 'center',
         paddingHorizontal: 16,
-        paddingVertical: 25,
+        paddingVertical: 16,
     },
     // CARD
     loginCard: {
         width: '100%',
         borderRadius: 32,
         paddingHorizontal: 24,
-        paddingVertical: 34,
+        paddingVertical: 24,
         alignItems: 'center',
         borderWidth: 1.5,
         borderColor: 'rgba(187,255,0,0.3)',
@@ -250,7 +256,13 @@ const styles = criarEstilos({
     // SOL ANIMADO IGUAL AO DA HOME
     logoContainer: {
         alignItems: 'center',
-        marginBottom: 30,
+        marginBottom: 24,
+    },
+    logoContainerCompacto: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 12,
+        marginBottom: 20,
     },
     sunGlow: {
         width: 126,
@@ -277,6 +289,17 @@ const styles = criarEstilos({
         justifyContent: 'center',
         backgroundColor: 'rgba(255,216,61,0.08)',
     },
+    sunGlowCompacto: {
+        width: 84,
+        height: 84,
+        borderRadius: 42,
+        marginBottom: 0,
+    },
+    sunInnerGlowCompacto: {
+        width: 76,
+        height: 76,
+        borderRadius: 38,
+    },
     welcomeText: {
         color: CORES.acento,
         fontSize: 29,
@@ -299,7 +322,7 @@ const styles = criarEstilos({
         gap: 8,
         minHeight: 48,
         paddingHorizontal: 20,
-        marginBottom: 20,
+        marginBottom: 16,
         borderWidth: 1,
         borderColor: '#BBFF00',
         borderRadius: 24,
@@ -339,7 +362,7 @@ const styles = criarEstilos({
     forgotButton: {
         alignSelf: 'flex-end',
         marginTop: 1,
-        marginBottom: 25,
+        marginBottom: 20,
         paddingHorizontal: 5,
     },
     forgotText: {

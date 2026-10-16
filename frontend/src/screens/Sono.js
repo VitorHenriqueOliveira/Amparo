@@ -500,8 +500,7 @@ export default function SonoScreen({ navigation }) {
                                             disabled={salvando}
                                         />
                                         <Text style={styles.modalAjuda}>
-                                            O progresso usa o mínimo da sua faixa. A meta fica salva na sua
-                                            conta.
+                                            O progresso considera o mínimo da sua meta.
                                         </Text>
                                     </>
                                 )}

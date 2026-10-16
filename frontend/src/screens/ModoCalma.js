@@ -84,7 +84,7 @@ export default function ModoCalmaScreen({ navigation }) {
 
                 setMensagemHistorico(local
                     ? 'Não foi possível atualizar o histórico agora. Você pode continuar respirando.'
-                    : 'Não foi possível acessar o histórico neste dispositivo.');
+                    : 'Não foi possível abrir seu histórico. Tente novamente.');
             }
         } finally {
             if (consultaVigente()) {
@@ -109,7 +109,7 @@ export default function ModoCalmaScreen({ navigation }) {
                 .then(() => carregarHistorico(idUsuario))
                 .catch(() => {
                     if (podeAtualizar(idUsuario)) {
-                        setMensagemHistorico('Não foi possível guardar este ciclo no dispositivo.');
+                        setMensagemHistorico('Não foi possível registrar este ciclo. Tente novamente.');
                     }
                 });
         },
@@ -117,9 +117,6 @@ export default function ModoCalmaScreen({ navigation }) {
 
     const fase = FASES_RESPIRACAO[estado.indiceFase];
     const registrosHistorico = historico.registros.slice(0, 50);
-
-    // A contagem de salvos acompanha os registros exibidos no histórico recente.
-    const ciclosSalvos = registrosHistorico.filter((registro) => !registro.pendente).length;
 
     useEffect(() => {
         if (!estado.emExecucao) {
@@ -269,7 +266,7 @@ export default function ModoCalmaScreen({ navigation }) {
                     titulo="Modo calma urgente"
                     navigation={navigation}
                     mostrarPerfil={!!idUsuario}
-                    onVoltar={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate(idUsuario ? 'Home' : 'Login')}
+                    onVoltar={() => navigation.navigate(idUsuario ? 'Home' : 'Login')}
                 />
 
                 <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -372,25 +369,19 @@ export default function ModoCalmaScreen({ navigation }) {
                                 </TouchableOpacity>
                             </View>
 
-                            <Text style={styles.cardSubtitle}>Seus ciclos mais recentes · até 50 registros</Text>
+                            <Text style={styles.cardSubtitle}>Seus ciclos de respiração</Text>
 
                             <View style={styles.historySummary}>
                                 <View style={styles.historySummaryItem}>
                                     <Text style={styles.historySummaryValue}>{estado.ciclosConcluidos}</Text>
-                                    <Text style={styles.historySummaryLabel}>Concluídos nesta visita</Text>
+                                    <Text style={styles.historySummaryLabel}>Nesta prática</Text>
                                 </View>
 
                                 <View style={styles.historySummaryItem}>
-                                    <Text style={styles.historySummaryValue}>{ciclosSalvos}</Text>
-                                    <Text style={styles.historySummaryLabel}>Salvos neste histórico</Text>
+                                    <Text style={styles.historySummaryValue}>{registrosHistorico.length}</Text>
+                                    <Text style={styles.historySummaryLabel}>Ciclos recentes</Text>
                                 </View>
                             </View>
-
-                            {historico.pendentes > 0 && (
-                                <Text style={styles.historyPending}>
-                                    {historico.pendentes} {historico.pendentes === 1 ? 'ciclo salvo' : 'ciclos salvos'} no dispositivo, aguardando envio.
-                                </Text>
-                            )}
 
                             <FlatList
                                 data={registrosHistorico} keyExtractor={(item) => item.id_cliente}
@@ -403,7 +394,7 @@ export default function ModoCalmaScreen({ navigation }) {
                                                 {new Date(item.concluido_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                                             </Text>
                                             <Text style={styles.historyStatus}>
-                                                {item.duracao_segundos} segundos · {item.pendente ? 'Aguardando envio' : 'Salvo na sua conta'}
+                                                {item.duracao_segundos} segundos
                                             </Text>
                                         </View>
                                     </View>
@@ -693,14 +684,6 @@ const styles = criarEstilos({
         fontSize: 12,
         textAlign: 'center',
         lineHeight: 17,
-    },
-
-    historyPending: {
-        color: '#E0F0C0',
-        fontSize: 12,
-        lineHeight: 18,
-        textAlign: 'center',
-        marginBottom: 12,
     },
 
     historyButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 44, marginTop: 10, gap: 8 },

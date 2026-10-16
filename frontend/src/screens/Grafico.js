@@ -317,7 +317,7 @@ export default function GraficoScreen({ navigation }) {
                         <Text style={styles.cardTitle}>Suas emoções</Text>
 
                         <Text style={styles.cardSubtitle}>
-                            Distribuição das emoções salvas na sua conta no período selecionado.
+                            Como você se sentiu no período selecionado.
                         </Text>
 
                         {carregando ? (

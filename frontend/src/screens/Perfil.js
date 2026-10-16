@@ -133,13 +133,6 @@ export default function Perfil({ navigation }) {
             ]);
         }
     }
-    function voltar() {
-        if (navigation.canGoBack()) {
-            navigation.goBack();
-        } else {
-            navigation.navigate('Home');
-        }
-    }
     return (
         <LinearGradient colors={DEGRADES.fundo} style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor={CORES.textoEscuro} />
@@ -151,7 +144,6 @@ export default function Perfil({ navigation }) {
                         titulo="Seu perfil"
                         navigation={navigation}
                         mostrarPerfil={false}
-                        onVoltar={voltar}
                         onEditar={abrirEdicao}
                         edicaoDesabilitada={ocupado}
                     />

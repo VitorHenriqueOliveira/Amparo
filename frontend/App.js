@@ -53,7 +53,7 @@ function RestaurandoScreen({ navigation }) {
     return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F0FCCE' }}>
             <ActivityIndicator size="large" color="#4E750F" />
-            <Text style={{ marginTop: 16, color: '#274804' }}>Verificando sua sessão…</Text>
+            <Text style={{ marginTop: 16, color: '#274804' }}>Carregando…</Text>
 
             <TouchableOpacity
                 onPress={() => navigation.navigate('CalmaUrgente')}

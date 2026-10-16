@@ -1,11 +1,14 @@
 import { criarEstilos } from '../theme/estilos';
 import { AreaDaTela, Cabecalho } from '../components/NavegacaoPadrao';
+import ConteudoAjustavel from '../components/ConteudoAjustavel';
 import { CORES, DEGRADES } from '../theme/tema';
 import { useEffect, useRef } from 'react';
-import { Platform, View, ScrollView, Text, TouchableOpacity, Animated, Easing } from 'react-native';
+import { Platform, View, Text, TouchableOpacity, Animated, Easing, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 export default function HomeScreen({ navigation }) {
+    const { height } = useWindowDimensions();
+    const compacto = height < 760;
     const sunScale = useRef(new Animated.Value(1)).current;
     const sunGlow = useRef(new Animated.Value(0.55)).current;
     useEffect(() => {
@@ -45,31 +48,31 @@ export default function HomeScreen({ navigation }) {
     const menuItems = [
         {
             title: 'Diário Emocional',
-            subtitle: 'Escreva sobre o seu dia',
+            subtitle: 'Escreva sobre seu dia',
             icon: 'book-outline',
             route: 'Diario',
         },
         {
             title: 'Registro Emocional',
-            subtitle: 'Registre como você se sente',
+            subtitle: 'Como você se sente?',
             icon: 'happy-outline',
             route: 'Emocao',
         },
         {
             title: 'Registro de Sono',
-            subtitle: 'Acompanhe suas noites',
+            subtitle: 'Acompanhe seu descanso',
             icon: 'moon-outline',
             route: 'Sono',
         },
         {
             title: 'Evolução Emocional',
-            subtitle: 'Veja seu progresso ao longo do tempo',
+            subtitle: 'Veja suas emoções',
             icon: 'trending-up-outline',
             route: 'Grafico',
         },
         {
             title: 'Modo Calma Urgente',
-            subtitle: 'Encontre um momento de tranquilidade',
+            subtitle: 'Respire e desacelere',
             icon: 'heart-outline',
             route: 'ModoCalma',
         },
@@ -81,18 +84,14 @@ export default function HomeScreen({ navigation }) {
                 <Cabecalho titulo="Amparo" navigation={navigation} marca />
 
                 {/* CONTEÚDO PRINCIPAL */}
-                <ScrollView
-                    style={styles.regiaoRolavel}
-                    contentContainerStyle={styles.mainContent}
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
-                >
-                    <LinearGradient colors={DEGRADES.cartao} style={styles.mainCard}>
+                <ConteudoAjustavel contentContainerStyle={styles.mainContent}>
+                    <LinearGradient colors={DEGRADES.cartao} style={[styles.mainCard, compacto && styles.mainCardCompacto]}>
                         {/* SOL ANIMADO E SAUDAÇÃO */}
-                        <View style={styles.logoContainer}>
+                        <View style={[styles.logoContainer, compacto && styles.logoContainerCompacto]}>
                             <Animated.View
                                 style={[
                                     styles.sunGlow,
+                                    compacto && styles.sunGlowCompacto,
                                     {
                                         opacity: sunGlow,
                                         transform: [
@@ -103,14 +102,16 @@ export default function HomeScreen({ navigation }) {
                                     },
                                 ]}
                             >
-                                <View style={styles.sunInnerGlow}>
-                                    <Ionicons name="sunny" size={96} color="#ffcc00" />
+                                <View style={[styles.sunInnerGlow, compacto && styles.sunInnerGlowCompacto]}>
+                                    <Ionicons name="sunny" size={compacto ? 64 : 96} color="#ffcc00" />
                                 </View>
                             </Animated.View>
 
-                            <Text style={styles.title}>Como você está?</Text>
+                            <View style={styles.saudacao}>
+                                <Text style={[styles.title, compacto && styles.textoCompacto]}>Como você está?</Text>
 
-                            <Text style={styles.subtitle}>Cuide de você hoje. Estamos aqui.</Text>
+                                <Text style={[styles.subtitle, compacto && styles.textoCompacto]}>Cuide de você hoje.</Text>
+                            </View>
                         </View>
 
                         {/* BOTÕES DO MENU */}
@@ -139,16 +140,12 @@ export default function HomeScreen({ navigation }) {
                             ))}
                         </View>
                     </LinearGradient>
-                </ScrollView>
+                </ConteudoAjustavel>
             </AreaDaTela>
         </LinearGradient>
     );
 }
 const styles = criarEstilos({
-    regiaoRolavel: {
-        flex: 1,
-        minHeight: 0,
-    },
     container: {
         flex: 1,
     },
@@ -159,14 +156,14 @@ const styles = criarEstilos({
         flexGrow: 1,
         justifyContent: 'center',
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingVertical: 8,
     },
     // CARD PRINCIPAL
     mainCard: {
         width: '100%',
         borderRadius: 32,
         paddingHorizontal: 16,
-        paddingVertical: 22,
+        paddingVertical: 18,
         borderWidth: 1.5,
         borderColor: 'rgba(187,255,0,0.3)',
         shadowColor: '#000',
@@ -178,10 +175,35 @@ const styles = criarEstilos({
         shadowRadius: 12,
         elevation: 12,
     },
+    mainCardCompacto: {
+        paddingVertical: 12,
+    },
     // SOL E SAUDAÇÃO
     logoContainer: {
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 16,
+    },
+    logoContainerCompacto: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 16,
+    },
+    saudacao: {
+        flexShrink: 1,
+    },
+    textoCompacto: {
+        textAlign: 'left',
+    },
+    sunGlowCompacto: {
+        width: 84,
+        height: 84,
+        borderRadius: 42,
+        marginBottom: 0,
+    },
+    sunInnerGlowCompacto: {
+        width: 76,
+        height: 76,
+        borderRadius: 38,
     },
     sunGlow: {
         width: 126,
@@ -225,10 +247,11 @@ const styles = criarEstilos({
     // BOTÕES
     buttonsContainer: {
         width: '100%',
+        gap: 8,
     },
     menuButton: {
         width: '100%',
-        minHeight: 65,
+        minHeight: 64,
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'rgba(255,255,255,0.06)',
@@ -236,8 +259,7 @@ const styles = criarEstilos({
         borderColor: 'rgba(255,255,255,0.10)',
         borderRadius: 20,
         paddingHorizontal: 12,
-        paddingVertical: 10,
-        marginBottom: 10,
+        paddingVertical: 8,
     },
     buttonIcon: {
         width: 45,
@@ -255,12 +277,12 @@ const styles = criarEstilos({
     },
     buttonTitle: {
         color: '#FFF',
-        fontSize: 15.5,
+        fontSize: 16,
         fontWeight: '800',
     },
     buttonSubtitle: {
         color: '#AFC88A',
-        fontSize: 11.5,
+        fontSize: 13,
         marginTop: 3,
     },
 });

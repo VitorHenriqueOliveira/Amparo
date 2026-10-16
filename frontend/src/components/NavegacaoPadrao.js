@@ -21,7 +21,6 @@ export function AreaDaTela({ children }) {
 export function Cabecalho({ titulo, navigation, marca = false, mostrarPerfil = true, onVoltar, onEditar, edicaoDesabilitada = false }) {
     const voltar = () => {
         if (onVoltar) onVoltar();
-        else if (navigation?.canGoBack()) navigation.goBack();
         else navigation?.navigate('Home');
     };
 
@@ -41,7 +40,7 @@ export function Cabecalho({ titulo, navigation, marca = false, mostrarPerfil = t
                     style={styles.lateral}
                     activeOpacity={0.8}
                     accessibilityRole="button"
-                    accessibilityLabel="Voltar"
+                    accessibilityLabel="Voltar para o início"
                 >
                     <Ionicons name="chevron-back" size={MEDIDAS.tamanhoIcone} color={CORES.icone} />
                 </TouchableOpacity>
