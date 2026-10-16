@@ -42,9 +42,9 @@ router.post('/emocoes', async (req, res) => {
         return res.status(400).json({ erro: 'Informe um identificador UUID válido para a confirmação.' });
     }
 
-    // O aplicativo não pode fornecer identificadores, datas ou horários do registro.
+    // O banco gera o identificador do registro, a data e a hora.
     if (Object.keys(req.body).some((campo) => !['id_emocao', 'id_usuario', 'id_cliente'].includes(campo))) {
-        return res.status(400).json({ erro: 'Envie somente a emoção. A data e a hora são geradas pelo servidor.' });
+        return res.status(400).json({ erro: 'Envie a emoção e a identificação da confirmação. A data e a hora são geradas pelo servidor.' });
     }
 
     try {

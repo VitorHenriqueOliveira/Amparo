@@ -1,6 +1,6 @@
 import "react-native-gesture-handler";
 import React from "react";
-import { LogBox, ActivityIndicator, View } from "react-native";
+import { LogBox, ActivityIndicator, View, Text, TouchableOpacity } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -48,22 +48,34 @@ function MainTabs() {
     );
 }
 
-// 1. Gerencia quem está logado ou não
+// A verificação da sessão não precisa bloquear o acesso ao exercício offline.
+function RestaurandoScreen({ navigation }) {
+    return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F0FCCE' }}>
+            <ActivityIndicator size="large" color="#4E750F" />
+            <Text style={{ marginTop: 16, color: '#274804' }}>Verificando sua sessão…</Text>
+
+            <TouchableOpacity
+                onPress={() => navigation.navigate('CalmaUrgente')}
+                style={{ marginTop: 24, padding: 16, borderRadius: 24, backgroundColor: '#BBFF00' }}
+                accessibilityRole="button"
+                accessibilityLabel="Abrir Calma Urgente sem esperar o login"
+            >
+                <Text style={{ color: '#274804', fontWeight: '700' }}>Calma Urgente</Text>
+            </TouchableOpacity>
+        </View>
+    );
+}
+
+// Gerencia o acesso aos dados pessoais depois da validação da sessão.
 function AppRoutes() {
     const { usuario, carregando, sessaoRestaurada } = React.useContext(AuthContext);
 
-    // Tela de carregamento enquanto o AsyncStorage procura o usuário
-    if (carregando) {
-        return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#4E750F" />
-            </View>
-        );
-    }
-
     return (
         <NavigationContainer>
-            <Stack.Navigator key={usuario ? 'autenticado' : 'visitante'} initialRouteName={usuario ? (sessaoRestaurada ? 'MainTabs' : 'Intro') : 'Login'} screenOptions={{ headerShown: false, animation: "fade" }}>
+            <Stack.Navigator key={usuario ? 'autenticado' : 'visitante'} initialRouteName={usuario ? (sessaoRestaurada ? 'MainTabs' : 'Intro') : (carregando ? 'Restaurando' : 'Login')} screenOptions={{ headerShown: false, animation: "fade" }}>
+
+                {carregando && <Stack.Screen name="Restaurando" component={RestaurandoScreen} />}
 
                 {usuario ? (
                     // Se ESTIVER logado, ele só tem acesso a essas telas:
@@ -72,8 +84,11 @@ function AppRoutes() {
                         <Stack.Screen name="Intro" component={IntroScreen} />
                     </>
                 ) : (
-                    // Se NÃO ESTIVER logado, ele fica preso no Login:
-                    <Stack.Screen name="Login" component={LoginScreen} />
+                    // A respiração é pública; dados pessoais continuam exigindo login.
+                    <>
+                        <Stack.Screen name="Login" component={LoginScreen} />
+                        <Stack.Screen name="CalmaUrgente" component={ModoCalmaScreen} />
+                    </>
                 )}
 
             </Stack.Navigator>

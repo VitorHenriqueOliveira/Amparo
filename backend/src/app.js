@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import rotasUsuario from './routes/usuario.js';
 import rotasDiario from './routes/diario.js';
+import rotasCalma from './routes/calma.js';
 import rotasEmocoes from './routes/emocoes.js';
 import rotasSono from './routes/sono.js';
 
@@ -57,6 +58,7 @@ export function criarApp({ origensPermitidas, proxiesConfiaveis = 0 }) {
 
     app.use(express.json({ limit: '64kb' }));
     app.use('/api', rotasUsuario);
+    app.use('/api', rotasCalma);
     app.use('/api', rotasEmocoes);
     app.use('/api', rotasSono);
     app.use('/api', rotasDiario);

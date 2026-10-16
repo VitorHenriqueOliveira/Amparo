@@ -326,21 +326,20 @@ test('produção rejeita API sem HTTPS antes de enviar credenciais', async () =>
     }), /HTTPS/);
 });
 
-test('emoções e sono ficam separados ao trocar de conta', async () => {
+test('histórico local permanece disponível apenas para a conta de origem', async () => {
     const storage = storageMock([
         ['@amparo/emocoes', JSON.stringify([{ emotionKey: 'triste' }])],
         ['@amparo/emocoes:7', JSON.stringify([{ emotionKey: 'feliz' }])],
-        ['@amparo/sono:7', JSON.stringify([{ date: '2026-10-13', totalMinutes: 480 }])],
+        ['@amparo/sono:7', JSON.stringify([{ date: '2026-10-14', sleepTime: '22:30', wakeTime: '06:30', totalMinutes: 480 }])],
     ]);
     const registros = await carregar('src/storage/registros.js', { '@react-native-async-storage/async-storage': storage });
     assert.equal((await registros.listarEmocoes(7))[0].emotionKey, 'feliz');
     assert.equal((await registros.listarSono(7))[0].totalMinutes, 480);
     assert.equal((await registros.listarEmocoes(8)).length, 0);
     assert.equal((await registros.listarSono(8)).length, 0);
-    assert.ok(storage.dados.has('@amparo/emocoes'), 'O histórico antigo não deve ser apagado nem atribuído a outra conta.');
+    await assert.rejects(registros.listarSono(undefined), /inválido/);
+    assert.ok(storage.dados.has('@amparo/emocoes'));
 });
-
-
 
 test('diário converte o contrato da API para as telas e envia CRUD para as rotas existentes', async () => {
     const chamadas = [];

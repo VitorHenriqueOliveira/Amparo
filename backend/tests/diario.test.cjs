@@ -140,6 +140,68 @@ async function criarServidor(t, protecoes = false) {
     };
 }
 
+test('calma registra somente ciclos válidos e mantém o histórico isolado por conta', async (t) => {
+    const api = await criarServidor(t, true);
+    const ciclo = {
+        id_cliente: '00000000-0000-4000-8000-000000000001',
+        concluido_em: new Date().toISOString(),
+    };
+    const salvo = { ...ciclo, id_calma: 42, duracao_segundos: 14 };
+
+    await t.test('sem token e com dono forjado não chega ao banco', async () => {
+        assert.equal((await api.request('/calma', 'GET', undefined, null)).status, 401);
+        assert.equal((await api.request('/calma', 'POST', ciclo, null)).status, 401);
+        assert.equal((await api.request('/calma', 'POST', { ...ciclo, id_usuario: 8 })).status, 403);
+        assert.equal(api.consultas.length, 0);
+    });
+
+    await t.test('UUID e data inválidos são rejeitados antes do SQL', async () => {
+        for (const body of [
+            {}, { ...ciclo, id_cliente: 'inválido' }, { ...ciclo, concluido_em: null },
+            { ...ciclo, concluido_em: '2999-01-01T00:00:00.000Z' },
+            { ...ciclo, concluido_em: '2026-02-30T00:00:00.000Z' },
+        ]) {
+            assert.equal((await api.request('/calma', 'POST', body)).status, 400);
+        }
+
+        assert.equal(api.consultas.length, 0);
+    });
+
+    await t.test('criação vincula o ciclo ao JWT e fixa sua duração', async () => {
+        api.resultado([salvo]);
+
+        const resposta = await api.request('/calma', 'POST', { ...ciclo, duracao_segundos: 999 });
+
+        assert.equal(resposta.status, 201);
+        assert.deepEqual(await resposta.json(), salvo);
+        assert.match(api.consultas.at(-1).query, /ON CONFLICT \(id_usuario, id_cliente\) DO NOTHING/);
+        assert.match(api.consultas.at(-1).query, /14/);
+        assert.deepEqual(Array.from(api.consultas.at(-1).valores), [7, ciclo.id_cliente, ciclo.concluido_em]);
+    });
+
+    await t.test('reenvio recebe o registro original sem duplicar ou mudar a data', async () => {
+        api.consulta((query) => query.includes('INSERT') ? [] : [salvo]);
+
+        const resposta = await api.request('/calma', 'POST', ciclo);
+
+        assert.equal(resposta.status, 200);
+        assert.deepEqual(await resposta.json(), salvo);
+        assert.deepEqual(Array.from(api.consultas.at(-1).valores), [7, ciclo.id_cliente]);
+    });
+
+    await t.test('histórico consulta apenas a conta autenticada e limita a resposta', async () => {
+        api.resultado([salvo]);
+
+        const resposta = await api.request('/calma');
+
+        assert.equal(resposta.status, 200);
+        assert.deepEqual(await resposta.json(), [salvo]);
+        assert.match(api.consultas.at(-1).query, /WHERE id_usuario = \?/);
+        assert.match(api.consultas.at(-1).query, /LIMIT 50/);
+        assert.deepEqual(Array.from(api.consultas.at(-1).valores), [7]);
+    });
+});
+
 test('diário mantém autenticação, CRUD e isolamento entre contas', async (t) => {
     const api = await criarServidor(t);
 
@@ -201,6 +263,37 @@ test('diário mantém autenticação, CRUD e isolamento entre contas', async (t)
         assert.equal((await api.request('/diario/42', 'PUT', { descricao: 'texto' })).status, 404);
         assert.equal((await api.request('/diario/42', 'DELETE')).status, 404);
     });
+});
+
+test('calma limita os envios por conta e mantém erros do banco privados', async (t) => {
+    const api = await criarServidor(t, true);
+    const ciclo = {
+        id_cliente: '00000000-0000-4000-8000-000000000001',
+        concluido_em: new Date().toISOString(),
+    };
+
+    api.resultado([{ ...ciclo, id_calma: 1, duracao_segundos: 14 }]);
+
+    for (let indice = 0; indice < 60; indice++) {
+        assert.equal((await api.request('/calma', 'POST', ciclo)).status, 201);
+    }
+
+    const consultasAntes = api.consultas.length;
+
+    assert.equal((await api.request('/calma', 'POST', ciclo)).status, 429);
+    assert.equal(api.consultas.length, consultasAntes);
+
+    const outraConta = jwt.sign({ id_usuario: 8 }, process.env.JWT_SECRET, opcoesToken);
+
+    assert.equal((await api.request('/calma', 'POST', ciclo, 'Bearer ' + outraConta)).status, 201);
+    assert.equal(api.consultas.at(-1).valores[0], 8);
+
+    api.consulta(() => { throw new Error('Detalhes privados da conexão.'); });
+
+    const falha = await api.request('/calma');
+
+    assert.equal(falha.status, 500);
+    assert.equal((await falha.json()).erro, 'Não foi possível carregar o histórico de calma.');
 });
 
 test('cadastro, login e restauração validam os dados de acesso', async (t) => {
@@ -374,7 +467,6 @@ test('configuração inválida falha sem revelar credenciais', async () => {
         TRUST_PROXY_HOPS: '1',
     }).origensPermitidas, ['https://app.example.com']);
 });
-
 
 test('registros emocionais exigem autenticação e dados definidos pelo servidor', async (t) => {
     const api = await criarServidor(t, true);
