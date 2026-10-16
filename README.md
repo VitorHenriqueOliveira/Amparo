@@ -15,15 +15,22 @@ A stack foi escolhida para garantir facilidade no desenvolvimento multiplataform
 | **Categoria**      | **Tecnologia** |
 | :----------------- | :------------- |
 | **Backend**        | ![Node.js](https://img.shields.io/badge/Node.js-43853d?style=for-the-badge&logo=node.js&logoColor=white)   |
-| **Mobile**         | ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black) ![React Native](https://img.shields.io/badge/React%20Native-61dafb?style=for-the-badge&logo=react&logoColor=black) ![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)      |
+| **Mobile / Web**   | ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black) ![React Native](https://img.shields.io/badge/React%20Native-61dafb?style=for-the-badge&logo=react&logoColor=black) ![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)      |
 | **Banco de Dados** | ![Neon](https://img.shields.io/badge/Neon-00E599?style=for-the-badge&logo=neon&logoColor=black) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white) |
+| **Hospedagem da API** | ![Render](https://img.shields.io/badge/Render-000000?style=for-the-badge&logo=render&logoColor=white) |
+| **Build Android** | ![EAS Build](https://img.shields.io/badge/EAS%20Build-000020?style=for-the-badge&logo=expo&logoColor=white) |
 
 ## ❓ Como Executar o Projeto
 
 > [!WARNING]
-> O projeto se encontra em desenvolvimento ativo. Siga o passo a passo para testar a interface atual em um ambiente local.
+> O projeto se encontra em desenvolvimento ativo. Escolha uma das opções abaixo para experimentar o Amparo.
 
-### 📋 Pré-requisitos
+* **Web ou Expo Go:** execute o projeto pelo computador e abra no navegador ou no celular.
+* **Build Android:** instale o aplicativo pronto no celular, conectado à API hospedada.
+
+## 🌐 Web ou Expo Go
+
+### Pré-requisitos
 
 * [Git](https://git-scm.com/install/windows) - sistema de controle de versão
 * [Node.js 24 LTS](https://nodejs.org/pt-br/download) - Inclui o Gerenciador NPM
@@ -31,13 +38,11 @@ A stack foi escolhida para garantir facilidade no desenvolvimento multiplataform
 * [Expo Go para Android](https://play.google.com/store/apps/details?id=host.exp.exponent)
 * [Expo Go para iOS](https://apps.apple.com/us/app/expo-go/id982107779)
 
-> **Nota:** É possível escolher rodar no navegador, não sendo necessário instalar o Expo Go. Para usar o celular, o Expo Go deve ser compatível com o SDK 57 do projeto; consulte as versões disponíveis em [expo.dev/go](https://expo.dev/go). No iOS físico, se a versão da App Store não suportar esse SDK, utilize uma [build de desenvolvimento](https://docs.expo.dev/develop/development-builds/introduction/).
+> **Nota:** Para abrir no navegador, basta seguir os passos abaixo pelo computador. No Android, selecione o SDK 57 em [expo.dev/go](https://expo.dev/go) para instalar o Expo Go compatível. No iPhone, se a versão da App Store não suportar esse SDK, utilize a opção Web.
 
 ---
 
-### 📂 Passo a passo
-
-#### Baixar o projeto
+### Baixar o projeto
 
 PowerShell / CMD / GitBash:
 
@@ -45,7 +50,7 @@ PowerShell / CMD / GitBash:
 git clone https://github.com/VitorHenriqueOliveira/Amparo
 ```
 
-#### Entrar na pasta do Amparo
+### Entrar na pasta do Amparo
 
 PowerShell / CMD / GitBash:
 
@@ -53,7 +58,7 @@ PowerShell / CMD / GitBash:
 cd Amparo
 ```
 
-#### Entrar na pasta de backend
+### Entrar na pasta de backend
 
 PowerShell / CMD / GitBash:
 
@@ -61,7 +66,7 @@ PowerShell / CMD / GitBash:
 cd backend
 ```
 
-#### Instalar as dependências:
+### Instalar as dependências do backend
 
 PowerShell / CMD / GitBash:
 
@@ -69,7 +74,7 @@ PowerShell / CMD / GitBash:
 npm ci
 ```
 
-#### Configurar o ambiente do backend
+### Configurar o ambiente do backend
 
 Crie o arquivo `backend/.env` a partir de `backend/.env.example` e configure:
 
@@ -82,7 +87,17 @@ Crie o arquivo `backend/.env` a partir de `backend/.env.example` e configure:
 | `CORS_ORIGINS` | `http://localhost:8081,http://127.0.0.1:8081` |
 | `TRUST_PROXY_HOPS` | `0` na execução local |
 
-#### Rodar o servidor
+### Preparar o banco de dados
+
+Na pasta `backend`, prepare as tabelas do banco configurado no arquivo `.env`:
+
+PowerShell / CMD / GitBash:
+
+```bash
+npm run db:migrate
+```
+
+### Rodar o servidor
 
 PowerShell / CMD / GitBash:
 
@@ -92,7 +107,7 @@ node src/server.js
 
 > **Nota:** O backend atende na porta `3000` por padrão, com as rotas da API em `http://localhost:3000/api`. Mantenha esse terminal aberto.
 
-#### Entrar na pasta de frontend
+### Entrar na pasta de frontend
 
 Abra um segundo terminal na pasta `Amparo`:
 
@@ -102,7 +117,7 @@ PowerShell / CMD / GitBash:
 cd frontend
 ```
 
-#### Instalar as dependências:
+### Instalar as dependências do frontend
 
 PowerShell / CMD / GitBash:
 
@@ -110,7 +125,7 @@ PowerShell / CMD / GitBash:
 npm ci
 ```
 
-#### Configurar o ambiente do frontend
+### Configurar o ambiente do frontend
 
 Crie o arquivo `frontend/.env` a partir de `frontend/.env.example`. Para testar no navegador do computador, mantenha:
 
@@ -121,7 +136,7 @@ EXPO_PUBLIC_API_URL=http://localhost:3000/api
 No celular, substitua `localhost` pelo IP do computador na rede local, mantenha o sufixo `/api` e conecte os dois dispositivos à mesma rede. 
 Se mudar a porta ou a origem web do Expo, ajuste também `CORS_ORIGINS` no backend.
 
-#### Executar o projeto:
+### Executar o projeto
 
 PowerShell / CMD / GitBash:
 
@@ -129,14 +144,43 @@ PowerShell / CMD / GitBash:
 npx expo start
 ```
 
-#### Link do servidor de desenvolvimento do Expo
+### Abrir no navegador ou no Expo Go
 
 ```text
 http://localhost:8081
 ```
 
-> **Nota:** Se estiver utilizando o Expo Go: Um QR Code será exibido no terminal, abra o aplicativo Expo Go no seu celular e escaneie o código para visualizar o app.
-> Para abrir no navegador, pressione `w` no terminal do Expo ou execute `npm run web` na pasta `frontend`.
+* **No navegador:** pressione `w` no terminal do Expo ou execute `npm run web` na pasta `frontend`.
+* **No Expo Go:** abra o aplicativo no celular e escaneie o QR Code exibido no terminal. No iPhone, abra o QR Code pela câmera.
+
+Mantenha os terminais do backend e do Expo abertos enquanto estiver utilizando esta opção.
+
+## 📱 Build Android (APK)
+
+### Pré-requisitos
+
+* Celular com Android 7.0 ou superior.
+* Conexão com a internet para entrar e acessar seus registros.
+
+### Baixar o aplicativo
+
+Abra o link abaixo pelo celular:
+
+[Baixar Amparo para Android](https://expo.dev/artifacts/eas/ocpmTn3lIStzUIf0fs0YVq2OdceP8Lk56aL9GayneQ4.apk)
+
+**Versão disponível:** 1.0.0 (build 3).
+
+### Instalar e abrir
+
+1. Abra o arquivo APK baixado e conclua a instalação no Android.
+2. Abra o aplicativo **Amparo (Teste)**.
+3. Entre com sua conta ou acesse o **Modo Calma Urgente** pela tela de login.
+
+Se já tiver a versão anterior instalada, instale esta atualização por cima dela.
+
+A build utiliza a API hospedada e pode ser usada sem manter o computador ligado ou configurar o ambiente local.
+
+> **Nota:** O primeiro acesso após um período sem uso pode demorar um pouco enquanto o servidor é ativado.
 
 ## 👥 Equipe do Projeto
 
