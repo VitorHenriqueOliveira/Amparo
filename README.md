@@ -1,8 +1,8 @@
 # ☀️ Amparo
 
 ![GitHub Licença](https://img.shields.io/badge/Licença-MIT-success.svg?style=flat-square&color=76ce3b)
-![SDK](https://img.shields.io/badge/SDK-57.0.14-4630EB?style=flat&logo=expo&logoColor=white&labelColor=000000)
-![NPM](https://img.shields.io/badge/NPM-11.6.2-brightgreen?style=flat&logo=npm&logoColor=white)
+![SDK](https://img.shields.io/badge/SDK-57.0.30-4630EB?style=flat&logo=expo&logoColor=white&labelColor=000000)
+![NPM](https://img.shields.io/badge/NPM-12.2.0-brightgreen?style=flat&logo=npm&logoColor=white)
 
 ## 🌱 Buscando auxiliar no bem-estar psicológico dos adolescentes.
 
@@ -26,11 +26,13 @@ A stack foi escolhida para garantir facilidade no desenvolvimento multiplataform
 ### 📋 Pré-requisitos
 
 * [Git](https://git-scm.com/install/windows) - sistema de controle de versão
-* [Node.js](https://nodejs.org/pt-br/download) - inclui o gerenciador **NPM**
+* [Node.js 24 LTS](https://nodejs.org/pt-br/download) - versão 24.15.0 ou superior da linha 24; ambiente validado com 24.22.0
+* [NPM 12.2.0](https://www.npmjs.com/package/npm) - após instalar o Node.js, atualize com `npm install --global npm@12.2.0`
+* [Neon](https://neon.tech/) ou outro PostgreSQL - banco de desenvolvimento para a API
 * [Expo Go para Android](https://play.google.com/store/apps/details?id=host.exp.exponent)
 * [Expo Go para iOS](https://apps.apple.com/us/app/expo-go/id982107779)
 
-> **Nota:** É possível escolher rodar no navegador, não sendo necessário instalar o Expo Go.
+> **Nota:** É possível escolher rodar no navegador, não sendo necessário instalar o Expo Go. Para usar o celular, o Expo Go deve ser compatível com o SDK 57 do projeto; consulte as versões disponíveis em [expo.dev/go](https://expo.dev/go). No iOS físico, se a versão da App Store não suportar esse SDK, utilize uma [build de desenvolvimento](https://docs.expo.dev/develop/development-builds/introduction/).
 
 ---
 
@@ -65,7 +67,32 @@ cd backend
 PowerShell / CMD / GitBash:
 
 ```bash
-npm install
+npm ci
+```
+
+#### Configurar o ambiente do backend
+
+Crie o arquivo `backend/.env` a partir de `backend/.env.example` e configure:
+
+| **Variável** | **Configuração local** |
+| :------------ | :--------------------- |
+| `DATABASE_URL` | Conexão PostgreSQL do banco de desenvolvimento; no Neon, mantenha `sslmode=require` |
+| `JWT_SECRET` | Segredo aleatório com pelo menos 32 bytes, exclusivo do ambiente |
+| `PORT` | `3000` |
+| `NODE_ENV` | `development` |
+| `CORS_ORIGINS` | `http://localhost:8081,http://127.0.0.1:8081` |
+| `TRUST_PROXY_HOPS` | `0` na execução local |
+
+Na pasta `backend`, confira as migrações pendentes:
+
+```bash
+npm run db:check
+```
+
+Se houver migrações pendentes, aplique-as no banco de desenvolvimento configurado:
+
+```bash
+npm run db:migrate
 ```
 
 #### Rodar o servidor
@@ -76,7 +103,11 @@ PowerShell / CMD / GitBash:
 node src/server.js
 ```
 
+O backend atende na porta `3000` por padrão, com as rotas da API em `http://localhost:3000/api`. Mantenha esse terminal aberto.
+
 #### Entrar na pasta de frontend
+
+Abra um segundo terminal na pasta `Amparo`:
 
 PowerShell / CMD / GitBash:
 
@@ -89,8 +120,18 @@ cd frontend
 PowerShell / CMD / GitBash:
 
 ```bash
-npm install
+npm ci
 ```
+
+#### Configurar o ambiente do frontend
+
+Crie o arquivo `frontend/.env` a partir de `frontend/.env.example`. Para testar no navegador do computador, mantenha:
+
+```dotenv
+EXPO_PUBLIC_API_URL=http://localhost:3000/api
+```
+
+No celular, substitua `localhost` pelo IP do computador na rede local, mantenha o sufixo `/api` e conecte os dois dispositivos à mesma rede. Se mudar a porta ou a origem web do Expo, ajuste também `CORS_ORIGINS` no backend. Em produção, `EXPO_PUBLIC_API_URL` deve usar HTTPS.
 
 #### Executar o projeto:
 
@@ -107,6 +148,19 @@ http://localhost:8081
 ```
 
 > **Nota:** Se estiver utilizando o Expo Go: Um QR Code será exibido no terminal, abra o aplicativo Expo Go no seu celular e escaneie o código para visualizar o app.
+
+Para abrir no navegador, pressione `w` no terminal do Expo ou execute `npm run web` na pasta `frontend`.
+
+#### Validar o projeto
+
+Execute `npm test` separadamente nas pastas `backend` e `frontend`. Os testes usam dados simulados e um banco em memória, sem alterar o banco configurado no `.env`.
+
+Na pasta `frontend`, confira a compatibilidade das dependências e gere os bundles web, Android e iOS:
+
+```bash
+npx expo install --check
+npx expo export --platform all --output-dir dist
+```
 
 ## 👥 Equipe do Projeto
 

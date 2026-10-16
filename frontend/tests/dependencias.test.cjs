@@ -10,7 +10,7 @@ const xcode = require('xcode');
 const raiz = path.join(__dirname, '..');
 const requireDoXcode = createRequire(require.resolve('xcode'));
 
-// Preserva a leitura de imagens usada pelo Metro após a atualização transitiva.
+// Preserva a leitura de imagens usada pelo Metro após atualizar as dependências.
 test('Metro lê as dimensões dos PNGs do projeto', () => {
     const pasta = path.join(raiz, 'assets', 'images');
     const imagens = fs.readdirSync(pasta).filter((nome) => nome.endsWith('.png'));
@@ -79,13 +79,13 @@ const imagensMalformadas = {
 
 // Isola os parsers para que uma regressão de loop infinito não trave os testes.
 for (const [formato, imagem] of Object.entries(imagensMalformadas)) {
-    test('image-size rejeita ' + formato + ' malformado sem travar', () => {
+    test('Metro rejeita PNG com conteúdo ' + formato + ' malformado sem travar', () => {
         const codigo = `
             const assert = require('node:assert/strict');
-            const { imageSize } = require('image-size');
+            const { getAssetSize } = require('metro/private/Assets');
             const imagem = Buffer.from(process.argv[1], 'base64');
 
-            assert.throws(() => imageSize(imagem), TypeError);
+            assert.throws(() => getAssetSize('png', imagem, 'invalida.png'), /Invalid png image asset/);
         `;
 
         execFileSync(process.execPath, ['-e', codigo, imagem.toString('base64')], {
