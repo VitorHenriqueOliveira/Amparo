@@ -26,8 +26,7 @@ A stack foi escolhida para garantir facilidade no desenvolvimento multiplataform
 ### 📋 Pré-requisitos
 
 * [Git](https://git-scm.com/install/windows) - sistema de controle de versão
-* [Node.js 24 LTS](https://nodejs.org/pt-br/download) - versão 24.15.0 ou superior da linha 24; ambiente validado com 24.22.0
-* [NPM 12.2.0](https://www.npmjs.com/package/npm) - após instalar o Node.js, atualize com `npm install --global npm@12.2.0`
+* [Node.js 24 LTS](https://nodejs.org/pt-br/download) - Inclui o Gerenciador NPM
 * [Neon](https://neon.tech/) ou outro PostgreSQL - banco de desenvolvimento para a API
 * [Expo Go para Android](https://play.google.com/store/apps/details?id=host.exp.exponent)
 * [Expo Go para iOS](https://apps.apple.com/us/app/expo-go/id982107779)
@@ -83,18 +82,6 @@ Crie o arquivo `backend/.env` a partir de `backend/.env.example` e configure:
 | `CORS_ORIGINS` | `http://localhost:8081,http://127.0.0.1:8081` |
 | `TRUST_PROXY_HOPS` | `0` na execução local |
 
-Na pasta `backend`, confira as migrações pendentes:
-
-```bash
-npm run db:check
-```
-
-Se houver migrações pendentes, aplique-as no banco de desenvolvimento configurado:
-
-```bash
-npm run db:migrate
-```
-
 #### Rodar o servidor
 
 PowerShell / CMD / GitBash:
@@ -103,7 +90,7 @@ PowerShell / CMD / GitBash:
 node src/server.js
 ```
 
-O backend atende na porta `3000` por padrão, com as rotas da API em `http://localhost:3000/api`. Mantenha esse terminal aberto.
+> **Nota:** O backend atende na porta `3000` por padrão, com as rotas da API em `http://localhost:3000/api`. Mantenha esse terminal aberto.
 
 #### Entrar na pasta de frontend
 
@@ -131,7 +118,8 @@ Crie o arquivo `frontend/.env` a partir de `frontend/.env.example`. Para testar 
 EXPO_PUBLIC_API_URL=http://localhost:3000/api
 ```
 
-No celular, substitua `localhost` pelo IP do computador na rede local, mantenha o sufixo `/api` e conecte os dois dispositivos à mesma rede. Se mudar a porta ou a origem web do Expo, ajuste também `CORS_ORIGINS` no backend. Em produção, `EXPO_PUBLIC_API_URL` deve usar HTTPS.
+No celular, substitua `localhost` pelo IP do computador na rede local, mantenha o sufixo `/api` e conecte os dois dispositivos à mesma rede. 
+Se mudar a porta ou a origem web do Expo, ajuste também `CORS_ORIGINS` no backend.
 
 #### Executar o projeto:
 
@@ -148,19 +136,7 @@ http://localhost:8081
 ```
 
 > **Nota:** Se estiver utilizando o Expo Go: Um QR Code será exibido no terminal, abra o aplicativo Expo Go no seu celular e escaneie o código para visualizar o app.
-
-Para abrir no navegador, pressione `w` no terminal do Expo ou execute `npm run web` na pasta `frontend`.
-
-#### Validar o projeto
-
-Execute `npm test` separadamente nas pastas `backend` e `frontend`. Os testes usam dados simulados e um banco em memória, sem alterar o banco configurado no `.env`.
-
-Na pasta `frontend`, confira a compatibilidade das dependências e gere os bundles web, Android e iOS:
-
-```bash
-npx expo install --check
-npx expo export --platform all --output-dir dist
-```
+> Para abrir no navegador, pressione `w` no terminal do Expo ou execute `npm run web` na pasta `frontend`.
 
 ## 👥 Equipe do Projeto
 
