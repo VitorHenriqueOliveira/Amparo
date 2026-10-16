@@ -569,3 +569,20 @@ test('reenvio da confirmação recupera a emoção original e rejeita mudança d
         assert.equal((await api.request('/emocoes', 'POST', { id_emocao: 'Feliz', id_cliente: invalido })).status, 400);
     }
 });
+
+test('perfil altera apenas o nome da própria conta e não aceita campos de autenticação', async (t) => {
+    const api = await criarServidor(t, true);
+    assert.equal((await api.request('/perfil', 'PUT', { nome: 'Novo nome' }, null)).status, 401);
+    for (const payload of [{ nome: ' ' }, { nome: 'x'.repeat(101) }, { nome: 'Novo', id_usuario: 8 }, { nome: 'Novo', senha: 'forjada' }]) {
+        assert.equal((await api.request('/perfil', 'PUT', payload)).status, 400);
+    }
+    assert.equal(api.consultas.length, 0);
+    api.resultado([{ id_usuario: 7, nome: 'Novo nome', email: 'teste@example.com' }]);
+    const resposta = await api.request('/perfil', 'PUT', { nome: ' Novo nome ' });
+    assert.equal(resposta.status, 200);
+    assert.deepEqual(api.consultas.at(-1).valores, ['Novo nome', 7]);
+    assert.match(api.consultas.at(-1).query, /WHERE id_usuario/);
+    assert.equal((await resposta.json()).usuario.nome, 'Novo nome');
+    api.resultado([]);
+    assert.equal((await api.request('/perfil', 'PUT', { nome: 'Novo' })).status, 401);
+});

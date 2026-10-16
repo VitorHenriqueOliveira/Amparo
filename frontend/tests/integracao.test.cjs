@@ -439,6 +439,18 @@ test('emoções inválidas não chegam à API e falhas de rede não confirmam pe
     await assert.rejects(emocoes.listarEmocoes(), /indisponível/);
 });
 
+test('perfil envia o nome normalizado ao servidor e propaga falhas sem afirmar que salvou', async () => {
+    const chamadas = [];
+    const api = { async put(...args) { chamadas.push(args); return { data: { usuario: { ...usuario, nome: 'Novo' } } }; } };
+    const perfil = await carregar('src/services/usuario.js', { './api': api });
+    assert.equal((await perfil.atualizarPerfil(' Novo ')).nome, 'Novo');
+    assert.deepEqual(JSON.parse(JSON.stringify(chamadas[0])), ['/perfil', { nome: 'Novo' }]);
+    await assert.rejects(perfil.atualizarPerfil(' '), /nome/);
+    await assert.rejects(perfil.atualizarPerfil('x'.repeat(101)), /nome/);
+    api.put = async () => { throw new Error('API indisponível'); };
+    await assert.rejects(perfil.atualizarPerfil('Novo'), /indisponível/);
+});
+
 test('tentativa de reenvio usa o mesmo identificador de confirmação', async () => {
     const chamadas = [];
     const id_cliente = 'c0b91490-11f5-4696-8bfd-968e21b87bba';
