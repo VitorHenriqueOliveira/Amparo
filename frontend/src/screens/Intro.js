@@ -1,6 +1,5 @@
 import { criarEstilos } from '../theme/estilos';
 import { AreaDaTela } from '../components/NavegacaoPadrao';
-import { CORES, DEGRADES } from '../theme/tema';
 import { useState } from 'react';
 import { View, ScrollView, Text, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -33,7 +32,7 @@ export default function IntroScreen({ navigation }) {
     };
     const currentSlide = SLIDES[currentIndex];
     return (
-        <LinearGradient colors={DEGRADES.fundo} locations={[0, 0.48, 1]} style={styles.container}>
+        <LinearGradient colors={['#4DA0E0', '#76C043', '#4E7810']} locations={[0, 0.48, 1]} style={styles.container}>
             <AreaDaTela>
                 {/* =========================
                                                 BRILHOS DECORATIVOS
@@ -47,7 +46,7 @@ export default function IntroScreen({ navigation }) {
                                   ========================= */}
 
                 <View style={styles.brandContainer}>
-                    <Ionicons name="leaf-outline" size={18} color={CORES.textoEscuro} />
+                    <Ionicons name="leaf-outline" size={18} color="#FFFFFF" />
 
                     <Text style={styles.brandText}>AMPARO</Text>
                 </View>
@@ -56,12 +55,14 @@ export default function IntroScreen({ navigation }) {
                                                 CONTEÚDO
                                   ========================= */}
 
-                <LinearGradient colors={DEGRADES.cartao} style={styles.cartaoIntro}>
+                <View style={styles.cartaoIntro}>
                     <ScrollView
                         style={styles.regiaoRolavel}
                         contentContainerStyle={styles.content}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
+                        bounces={false}
+                        alwaysBounceVertical={false}
                     >
                         {/* SOL */}
                         <View style={styles.sunContainer}>
@@ -115,7 +116,7 @@ export default function IntroScreen({ navigation }) {
                             <Ionicons name="arrow-forward" size={21} color="#4E7810" />
                         </TouchableOpacity>
                     </ScrollView>
-                </LinearGradient>
+                </View>
             </AreaDaTela>
         </LinearGradient>
     );
@@ -124,10 +125,6 @@ const styles = criarEstilos({
     cartaoIntro: {
         flex: 1,
         minHeight: 0,
-        marginHorizontal: 16,
-        marginBottom: 8,
-        borderRadius: 28,
-        overflow: 'hidden',
     },
     regiaoRolavel: {
         flex: 1,
@@ -139,6 +136,9 @@ const styles = criarEstilos({
 
     container: {
         flex: 1,
+        minHeight: 0,
+        overflow: 'hidden',
+        backgroundColor: '#4E7810',
     },
     /* =========================
                 BRILHO DO SOL
@@ -174,7 +174,7 @@ const styles = criarEstilos({
         marginTop: 18,
     },
     brandText: {
-        color: CORES.textoEscuro,
+        color: '#FFFFFF',
         fontSize: 18,
         fontWeight: '900',
         letterSpacing: 3,
@@ -187,6 +187,7 @@ const styles = criarEstilos({
         flexGrow: 1,
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: 20,
         paddingHorizontal: 28,
         paddingTop: 18,
         paddingBottom: 20,
@@ -229,7 +230,7 @@ const styles = criarEstilos({
     ========================= */
 
     titleText: {
-        color: CORES.acento,
+        color: '#FFD700',
         fontSize: 29,
         fontWeight: '900',
         textAlign: 'center',
@@ -286,7 +287,7 @@ const styles = criarEstilos({
     },
     activeDot: {
         width: 28,
-        backgroundColor: CORES.acento,
+        backgroundColor: '#FFD700',
     },
     inactiveDot: {
         width: 8,
@@ -304,8 +305,8 @@ const styles = criarEstilos({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 9,
-        backgroundColor: CORES.acento,
-        shadowColor: CORES.acento,
+        backgroundColor: '#FFD700',
+        shadowColor: '#FFD700',
         shadowOffset: {
             width: 0,
             height: 4,

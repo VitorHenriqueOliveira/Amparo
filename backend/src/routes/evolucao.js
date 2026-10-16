@@ -1,6 +1,7 @@
 import express from 'express';
 import sql from '../db.js';
 import verificarToken from '../middlewares/auth.js';
+import { periodoValido } from '../utils/periodo.js';
 
 const router = express.Router();
 const chaves = ['feliz', 'triste', 'neutro', 'raiva'];
@@ -27,22 +28,6 @@ const conselhos = {
     },
 };
 
-function diaValido(valor) {
-    if (typeof valor !== 'string' || !/^[1-9]\d{3}-\d{2}-\d{2}$/.test(valor)) return false;
-    const data = new Date(valor + 'T00:00:00Z');
-    return Number.isFinite(data.getTime()) && data.toISOString().slice(0, 10) === valor;
-}
-
-function fusoValido(valor) {
-    if (typeof valor !== 'string' || valor.length > 100 || /^[+-]/.test(valor)) return false;
-    try {
-        new Intl.DateTimeFormat('en', { timeZone: valor });
-        return true;
-    } catch {
-        return false;
-    }
-}
-
 // Distribui o arredondamento para que a legenda sempre some exatamente 100%.
 function calcularPercentuais(contagens, total) {
     const partes = chaves.map((chave) => ({ chave, valor: total ? contagens[chave] * 100 / total : 0 }));
@@ -58,10 +43,8 @@ function calcularPercentuais(contagens, total) {
 
 router.get('/emocoes/evolucao', verificarToken, async (req, res) => {
     const { inicio, fim, fuso_horario: fuso } = req.query;
-    const dias = (Date.parse(fim) - Date.parse(inicio)) / 86400000;
     if (Object.keys(req.query).some((chave) => !['inicio', 'fim', 'fuso_horario'].includes(chave))
-        || !diaValido(inicio) || !diaValido(fim) || !fusoValido(fuso)
-        || dias < 0 || dias > 365) {
+        || !periodoValido(inicio, fim, fuso)) {
         return res.status(400).json({ erro: 'Informe datas válidas, em ordem, com até 366 dias e um fuso horário válido.' });
     }
 
@@ -114,16 +97,27 @@ router.get('/emocoes/evolucao', verificarToken, async (req, res) => {
         const total = Object.values(contagens).reduce((soma, valor) => soma + valor, 0);
         const maior = Math.max(...Object.values(contagens));
         const predominantes = total ? chaves.filter((chave) => contagens[chave] === maior) : [];
-        const conselho = total === 0 ? {
+        const totalNotas = registros.reduce((soma, item) => soma + item.total_notas, 0);
+        const diasComNotas = registros.filter((item) => item.total_notas > 0).length;
+        const duracoes = registros.filter((item) => item.minutos_sono !== null).map((item) => item.minutos_sono);
+        const mensagemSemEmocoes = totalNotas > 0 ? {
+            titulo: 'Seu diário faz parte da sua evolução',
+            texto: `Você escreveu ${totalNotas} ${totalNotas === 1 ? 'registro' : 'registros'} em ${diasComNotas} ${diasComNotas === 1 ? 'dia' : 'dias'} deste período. Releia suas palavras para acompanhar seus momentos. Ainda não há emoções registradas neste intervalo.`,
+            icone: 'book-outline',
+        } : duracoes.length ? {
+            titulo: 'Seu descanso também está registrado',
+            texto: 'Você já tem registros de sono neste período. Adicione suas emoções e anotações ao diário para acompanhar outros aspectos do seu dia.',
+            icone: 'moon-outline',
+        } : {
             titulo: 'Comece por você',
             texto: 'Não há emoções registradas neste período. Registre como está se sentindo e acompanhe seus próximos momentos.',
             icone: 'leaf-outline',
-        } : predominantes.length === 1 ? conselhos[predominantes[0]] : {
+        };
+        const conselho = total === 0 ? mensagemSemEmocoes : predominantes.length === 1 ? conselhos[predominantes[0]] : {
             titulo: 'Continue se observando',
             texto: 'Há um empate entre as emoções mais registradas neste período. Continue anotando como se sente e observe o que acontece ao seu redor.',
             icone: 'leaf-outline',
         };
-        const duracoes = registros.filter((item) => item.minutos_sono !== null).map((item) => item.minutos_sono);
         const mediaSono = duracoes.length ? Math.round(duracoes.reduce((soma, valor) => soma + valor, 0) / duracoes.length) : null;
         const meta = { min: registros[0].meta_sono_horas_min, max: registros[0].meta_sono_horas_max };
         const alertaSono = mediaSono !== null && mediaSono < meta.min * 60 ? {
@@ -136,7 +130,7 @@ router.get('/emocoes/evolucao', verificarToken, async (req, res) => {
             periodo: { inicio, fim, fuso_horario: fuso }, total, contagens,
             percentuais: calcularPercentuais(contagens, total), predominantes, conselho, alertaSono,
             mediaSono, totalSono: duracoes.length, meta,
-            totalNotas: registros.reduce((soma, item) => soma + item.total_notas, 0),
+            totalNotas, diario: { total: totalNotas, diasComRegistros: diasComNotas },
             dias: registros.map((item) => ({
                 chave: item.dia,
                 emocao: item.ultima_emocao ? { emotionKey: item.ultima_emocao.toLowerCase() } : null,

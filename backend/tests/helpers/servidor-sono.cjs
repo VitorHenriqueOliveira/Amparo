@@ -7,7 +7,8 @@ const { PGlite } = require('@electric-sql/pglite');
 async function criarAmbienteSono(porta = 0) {
     const banco = new PGlite();
     for (const nome of ['001_estrutura_inicial.sql', '002_calma_historico.sql',
-        '003_registro_emocional.sql', '004_integridade_dos_registros.sql', '006_registro_sono.sql']) {
+        '003_registro_emocional.sql', '004_integridade_dos_registros.sql', '006_registro_sono.sql',
+        '007_preferencias_perfil.sql', '008_importacao_historicos.sql']) {
         await banco.exec(fs.readFileSync(path.join(__dirname, '../../migrations', nome), 'utf8'));
     }
     const hash = await require('bcrypt').hash('teste1234', 10);
@@ -28,6 +29,7 @@ async function criarAmbienteSono(porta = 0) {
         'express-rate-limit': { rateLimit: require('express-rate-limit').rateLimit },
         jsonwebtoken: { default: jwt },
         bcrypt: { default: require('bcrypt') },
+        'node:crypto': { createHash: require('node:crypto').createHash },
         '../db.js': { default: sql },
     };
     const modulos = new Map();

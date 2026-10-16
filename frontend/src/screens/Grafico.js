@@ -11,6 +11,7 @@ import { buscarEvolucao } from '../services/evolucao';
 import { formatarDuracao } from '../utils/sono';
 import { chaveData, obterPeriodo, moverPeriodo, nomeDia } from '../utils/evolucao';
 import { AuthContext } from '../contexts/AuthContext';
+import RegistrosDiario from '../components/RegistrosDiario';
 const EMOCOES = {
     feliz: {
         titulo: 'Feliz',
@@ -85,7 +86,7 @@ function GraficoPizza({ contagens, percentuais, total }) {
                 {total === 0 ? (
                     <View style={styles.pieEmpty}>
                         <Ionicons name="analytics-outline" size={42} color="#6D8D3D" />
-                        <Text style={styles.pieEmptyText}>Sem registros neste período</Text>
+                        <Text style={styles.pieEmptyText}>Sem emoções registradas neste período</Text>
                     </View>
                 ) : (
                     <Svg width={220} height={220} viewBox="0 0 200 200">
@@ -151,7 +152,7 @@ function GraficoPizza({ contagens, percentuais, total }) {
     );
 }
 export default function GraficoScreen({ navigation }) {
-    const { usuario } = useContext(AuthContext);
+    const { usuario, revisaoHistoricos } = useContext(AuthContext);
     const idUsuario = usuario.id_usuario;
     const [filtro, setFiltro] = useState('Mês');
     const [referencia, setReferencia] = useState(() => new Date());
@@ -159,6 +160,7 @@ export default function GraficoScreen({ navigation }) {
     const [dados, setDados] = useState(null);
     const [carregando, setCarregando] = useState(true);
     const [erro, setErro] = useState(false);
+    const [consultaDiario, setConsultaDiario] = useState(null);
     const periodo = obterPeriodo(filtro, referencia);
     const { inicio, fim } = periodo;
 
@@ -178,8 +180,8 @@ export default function GraficoScreen({ navigation }) {
                 if (ativo) setCarregando(false);
             });
         // Uma resposta atrasada não pode substituir o período ou a conta atual.
-        return () => { ativo = false; };
-    }, [idUsuario, inicio, fim, tentativa]));
+        return () => { ativo = false; setConsultaDiario(null); };
+    }, [idUsuario, inicio, fim, tentativa, revisaoHistoricos]));
 
     const relatorio = dados?.idUsuario === idUsuario && dados.relatorio.periodo.inicio === inicio
         && dados.relatorio.periodo.fim === fim ? dados.relatorio : null;
@@ -190,6 +192,11 @@ export default function GraficoScreen({ navigation }) {
     const tituloPeriodo = periodo.titulo;
     const proximaReferencia = moverPeriodo(filtro, referencia, 1);
     const podeAvancar = obterPeriodo(filtro, proximaReferencia).inicio <= chaveData(new Date());
+
+    function abrirDiario() {
+        setConsultaDiario(null);
+        navigation.navigate('Diario');
+    }
 
     return (
         <LinearGradient colors={DEGRADES.fundo} style={styles.container}>
@@ -241,7 +248,10 @@ export default function GraficoScreen({ navigation }) {
                             <Text style={styles.summaryLabel}>Média de sono</Text>
                         </View>
 
-                        <View style={styles.summaryCard}>
+                        <TouchableOpacity style={styles.summaryCard}
+                            onPress={() => setConsultaDiario(periodo)} disabled={!relatorio || carregando}
+                            accessibilityRole="button" accessibilityLabel="Ver registros do diário no período"
+                            accessibilityState={{ disabled: !relatorio || carregando }}>
                             <Ionicons name="book-outline" size={23} color="#D5FF73" />
                             <Text
                                 style={styles.summaryNumber}
@@ -252,7 +262,7 @@ export default function GraficoScreen({ navigation }) {
                                 {totalNotas ?? '—'}
                             </Text>
                             <Text style={styles.summaryLabel}>Notas no diário</Text>
-                        </View>
+                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.filterBox}>
@@ -269,7 +279,7 @@ export default function GraficoScreen({ navigation }) {
                                 accessibilityRole="button" accessibilityLabel="Período anterior" style={styles.periodArrow}>
                                 <Ionicons name="chevron-back" size={22} color="#D5FF73" />
                             </TouchableOpacity>
-                            <Text style={styles.periodRange}>{inicio.split('-').reverse().join('/')} a {fim.split('-').reverse().join('/')}</Text>
+                            <Text style={styles.periodRange}>{periodo.intervalo}</Text>
                             <TouchableOpacity onPress={() => setReferencia(proximaReferencia)} disabled={!podeAvancar}
                                 accessibilityRole="button" accessibilityLabel="Próximo período"
                                 accessibilityState={{ disabled: !podeAvancar }} style={styles.periodArrow}>
@@ -307,7 +317,7 @@ export default function GraficoScreen({ navigation }) {
                         <Text style={styles.cardTitle}>Suas emoções</Text>
 
                         <Text style={styles.cardSubtitle}>
-                            Distribuição dos registros salvos na sua conta no período selecionado.
+                            Distribuição das emoções salvas na sua conta no período selecionado.
                         </Text>
 
                         {carregando ? (
@@ -329,6 +339,33 @@ export default function GraficoScreen({ navigation }) {
                                 )}
                             </>
                         ) : <Text style={styles.emptyText}>Dados indisponíveis.</Text>}
+                    </View>
+
+                    <View style={styles.card}>
+                        <Text style={styles.cardTitle}>Seu diário neste período</Text>
+                        {carregando ? (
+                            <Text style={styles.emptyText}>Carregando atividade do diário…</Text>
+                        ) : relatorio ? (
+                            <>
+                                <Text style={styles.cardSubtitle}>
+                                    {totalNotas > 0
+                                        ? `${totalNotas} ${totalNotas === 1 ? 'registro escrito' : 'registros escritos'} em ${relatorio.diario.diasComRegistros} ${relatorio.diario.diasComRegistros === 1 ? 'dia' : 'dias'}. Releia suas palavras e acompanhe seus momentos.`
+                                        : 'Você ainda não escreveu no diário neste período.'}
+                                </Text>
+                                {totalNotas > 0 && (
+                                    <TouchableOpacity style={styles.diaryButton} onPress={() => setConsultaDiario(periodo)}
+                                        accessibilityRole="button" accessibilityLabel="Ler registros do diário no período">
+                                        <Ionicons name="book-outline" size={19} color={CORES.textoEscuro} />
+                                        <Text style={styles.diaryButtonText}>Ler registros</Text>
+                                    </TouchableOpacity>
+                                )}
+                                <TouchableOpacity style={styles.diaryLink} onPress={abrirDiario}
+                                    accessibilityRole="button" accessibilityLabel="Abrir diário para escrever">
+                                    <Text style={styles.diaryLinkText}>Abrir diário</Text>
+                                    <Ionicons name="arrow-forward" size={17} color="#D5FF73" />
+                                </TouchableOpacity>
+                            </>
+                        ) : <Text style={styles.emptyText}>Atividade do diário indisponível. Tente carregar o período novamente.</Text>}
                     </View>
 
                     {[relatorio?.conselho, relatorio?.alertaSono].filter(Boolean).map((conselho) => (
@@ -394,7 +431,7 @@ export default function GraficoScreen({ navigation }) {
                                             </View>
 
                                             <Text style={styles.dayEmotionTitle} numberOfLines={2}>
-                                                {emocao ? emocao.titulo : 'Sem registro'}
+                                                {emocao ? emocao.titulo : 'Sem emoção'}
                                             </Text>
 
                                             <View style={styles.dayDetail}>
@@ -404,12 +441,18 @@ export default function GraficoScreen({ navigation }) {
                                                 </Text>
                                             </View>
 
-                                            <View style={styles.dayDetail}>
+                                            <TouchableOpacity style={[styles.dayDetail, styles.dayDiary]}
+                                                disabled={dia.quantidadeNotas === 0}
+                                                onPress={() => setConsultaDiario({ inicio: dia.chave, fim: dia.chave,
+                                                    intervalo: `Dia ${dia.chave.split('-').reverse().join('/')}` })}
+                                                accessibilityRole="button"
+                                                accessibilityLabel={`Ver diário de ${dia.chave.split('-').reverse().join('/')}: ${dia.quantidadeNotas} ${dia.quantidadeNotas === 1 ? 'nota' : 'notas'}`}
+                                                accessibilityState={{ disabled: dia.quantidadeNotas === 0 }}>
                                                 <Ionicons name="book-outline" size={14} color="#D5FF73" />
-                                                <Text style={styles.dayDetailText}>
-                                                    {dia.quantidadeNotas} nota(s)
+                                                <Text style={[styles.dayDetailText, dia.quantidadeNotas > 0 && styles.dayDiaryLink]}>
+                                                    {dia.quantidadeNotas} {dia.quantidadeNotas === 1 ? 'nota' : 'notas'}
                                                 </Text>
-                                            </View>
+                                            </TouchableOpacity>
                                         </View>
                                     );
                                 })}
@@ -426,10 +469,25 @@ export default function GraficoScreen({ navigation }) {
                 {/* Navegação inferior padronizada */}
                 <NavegacaoInferior navigation={navigation} ativa="Grafico" />
             </AreaDaTela>
+            {consultaDiario && (
+                <RegistrosDiario
+                    key={`${idUsuario}:${consultaDiario.inicio}:${consultaDiario.fim}`}
+                    periodo={consultaDiario}
+                    onFechar={() => setConsultaDiario(null)}
+                    onAbrirDiario={abrirDiario}
+                />
+            )}
         </LinearGradient>
     );
 }
 const styles = criarEstilos({
+    diaryButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+        backgroundColor: CORES.acento, minHeight: 46, padding: 12, borderRadius: 16, marginTop: 8 },
+    diaryButtonText: { color: CORES.textoEscuro, fontSize: 14, fontWeight: '800' },
+    diaryLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44, marginTop: 8 },
+    diaryLinkText: { color: '#D5FF73', fontSize: 13, fontWeight: '700' },
+    dayDiary: { minHeight: 44, paddingHorizontal: 4 },
+    dayDiaryLink: { color: '#D5FF73', textDecorationLine: 'underline' },
     container: {
         flex: 1,
     },

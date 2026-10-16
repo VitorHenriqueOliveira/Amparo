@@ -1,10 +1,11 @@
 import { criarEstilos } from '../theme/estilos';
+import { AreaDaTela, Cabecalho, NavegacaoInferior } from '../components/NavegacaoPadrao';
+import { DEGRADES, MEDIDAS } from '../theme/tema';
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
     View, Text, TouchableOpacity, Animated, Easing,
     AppState, AccessibilityInfo, ScrollView, Modal, FlatList, Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
@@ -24,13 +25,6 @@ const CirculoProgresso = React.forwardRef((propriedades, referencia) => {
 });
 const CirculoAnimado = Animated.createAnimatedComponent(CirculoProgresso);
 const CIRCUNFERENCIA = 2 * Math.PI * 114;
-const NAVEGACAO = [
-    { icone: 'book-outline', rota: 'Diario', titulo: 'Diário' },
-    { icone: 'happy-outline', rota: 'Emocao', titulo: 'Registro emocional' },
-    { icone: 'moon-outline', rota: 'Sono', titulo: 'Sono' },
-    { icone: 'trending-up-outline', rota: 'Grafico', titulo: 'Evolução emocional' },
-    { icone: 'heart-outline', rota: 'ModoCalma', titulo: 'Modo Calma Urgente' },
-];
 
 export default function ModoCalmaScreen({ navigation }) {
     const { usuario } = useContext(AuthContext);
@@ -269,28 +263,16 @@ export default function ModoCalmaScreen({ navigation }) {
     });
 
     return (
-        <LinearGradient colors={['#BBFF00', '#F0FCCE', '#72A600']} style={styles.container}>
-            <SafeAreaView style={styles.safeArea}>
-                <LinearGradient colors={['#2A4705', '#162802']} style={styles.headerBar}>
-                    <TouchableOpacity
-                        style={styles.headerSide}
-                        onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate(idUsuario ? 'Home' : 'Login')}
-                        accessibilityRole="button" accessibilityLabel="Voltar"
-                    >
-                        <Ionicons name="chevron-back" size={27} color="#BBFF00" />
-                    </TouchableOpacity>
+        <LinearGradient colors={DEGRADES.fundo} style={styles.container}>
+            <AreaDaTela>
+                <Cabecalho
+                    titulo="Modo calma urgente"
+                    navigation={navigation}
+                    mostrarPerfil={!!idUsuario}
+                    onVoltar={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate(idUsuario ? 'Home' : 'Login')}
+                />
 
-                    <Text style={styles.headerTitle}>Modo calma urgente</Text>
-
-                    <TouchableOpacity
-                        style={styles.headerSide} onPress={() => navigation.navigate(idUsuario ? 'Perfil' : 'Login')}
-                        accessibilityRole="button" accessibilityLabel={idUsuario ? 'Abrir perfil' : 'Entrar na conta'}
-                    >
-                        <Ionicons name="person-circle-outline" size={31} color="#BBFF00" />
-                    </TouchableOpacity>
-                </LinearGradient>
-
-                <ScrollView contentContainerStyle={styles.content}>
+                <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                     <LinearGradient colors={['#3A6B0A', '#234104', '#142702']} style={styles.mainCard}>
                         <Ionicons name="leaf-outline" size={36} color="#BBFF00" />
                         <Text style={styles.cardTitle}>Modo Calma Urgente</Text>
@@ -361,26 +343,18 @@ export default function ModoCalmaScreen({ navigation }) {
                     </LinearGradient>
                 </ScrollView>
 
-                <LinearGradient colors={['#2A4705', '#162802']} style={styles.floatingBottomNav}>
-                    {idUsuario ? NAVEGACAO.map((item) => (
-                        <TouchableOpacity
-                            key={item.rota} style={styles.navItem} onPress={() => navigation.navigate(item.rota)}
-                            accessibilityRole="button" accessibilityState={{ selected: item.rota === 'ModoCalma' }}
-                            accessibilityLabel={item.titulo}
-                        >
-                            <View style={[styles.navCircle, item.rota === 'ModoCalma' && styles.navCircleActive]}>
-                                <Ionicons name={item.icone} size={20} color={item.rota === 'ModoCalma' ? '#162704' : '#E0F0C0'} />
-                            </View>
-                        </TouchableOpacity>
-                    )) : (
+                {idUsuario ? (
+                    <NavegacaoInferior navigation={navigation} ativa="ModoCalma" />
+                ) : (
+                    <LinearGradient colors={DEGRADES.navegacao} style={styles.floatingBottomNav}>
                         <TouchableOpacity
                             style={styles.navItem} onPress={() => navigation.navigate('Login')}
                             accessibilityRole="button" accessibilityLabel="Voltar ao acesso"
                         >
                             <Text style={styles.historyButtonText}>Voltar ao acesso</Text>
                         </TouchableOpacity>
-                    )}
-                </LinearGradient>
+                    </LinearGradient>
+                )}
 
                 <Modal
                     visible={historicoAberto} transparent animationType={reduzirMovimento ? 'none' : 'fade'}
@@ -446,7 +420,7 @@ export default function ModoCalmaScreen({ navigation }) {
                         </View>
                     </View>
                 </Modal>
-            </SafeAreaView>
+            </AreaDaTela>
         </LinearGradient>
     );
 }
@@ -456,27 +430,9 @@ const styles = criarEstilos({
         flex: 1,
     },
 
-    safeArea: {
+    scroll: {
         flex: 1,
-    },
-
-    headerBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginHorizontal: 16,
-        marginTop: 8,
-        marginBottom: 12,
-        height: 60,
-        paddingHorizontal: 12,
-        borderRadius: 25,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.15)',
-        elevation: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
+        minHeight: 0,
     },
 
     headerSide: {
@@ -484,15 +440,6 @@ const styles = criarEstilos({
         height: 44,
         alignItems: 'center',
         justifyContent: 'center',
-    },
-
-    headerTitle: {
-        flex: 1,
-        color: '#FFF',
-        fontSize: 17,
-        fontWeight: '800',
-        textAlign: 'center',
-        letterSpacing: 0.2,
     },
 
     content: {
@@ -505,7 +452,6 @@ const styles = criarEstilos({
     },
 
     mainCard: {
-        maxWidth: 520,
         width: '100%',
         borderRadius: 30,
         paddingHorizontal: 18,
@@ -610,7 +556,7 @@ const styles = criarEstilos({
         fontSize: 14,
         fontWeight: '600',
         textAlign: 'center',
-        marginTop: 5,
+        marginTop: 10,
         paddingHorizontal: 8,
         lineHeight: 20,
     },
@@ -619,8 +565,8 @@ const styles = criarEstilos({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 12,
-        marginTop: 12,
+        gap: 16,
+        marginTop: 20,
     },
 
     breathingPauseButton: {
@@ -681,7 +627,7 @@ const styles = criarEstilos({
         fontSize: 11,
         lineHeight: 16,
         fontWeight: '500',
-        marginTop: 10,
+        marginTop: 18,
         textAlign: 'center',
     },
 
@@ -689,11 +635,15 @@ const styles = criarEstilos({
         flexDirection: 'row',
         justifyContent: 'space-around',
         alignItems: 'center',
-        height: 62,
-        marginHorizontal: 16,
+        height: MEDIDAS.alturaBarra,
+        minHeight: MEDIDAS.alturaBarra,
+        maxHeight: MEDIDAS.alturaBarra,
+        flexShrink: 0,
+        marginHorizontal: MEDIDAS.margemHorizontal,
+        marginTop: 8,
         marginBottom: 8,
-        borderRadius: 30,
-        paddingHorizontal: 4,
+        borderRadius: MEDIDAS.alturaBarra / 2,
+        paddingHorizontal: 8,
         elevation: 6,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 3 },
@@ -708,22 +658,9 @@ const styles = criarEstilos({
         justifyContent: 'center',
     },
 
-    navCircle: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: 'transparent',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-
-    navCircleActive: {
-        backgroundColor: '#C8FF00',
-    },
-
     ring: { position: 'absolute' },
 
-    supportText: { color: '#FFF', fontSize: 16, fontWeight: '700', textAlign: 'center', marginTop: 8 },
+    supportText: { color: '#FFF', fontSize: 16, fontWeight: '700', textAlign: 'center', marginTop: 16 },
 
     historySummary: {
         flexDirection: 'row',
@@ -766,7 +703,7 @@ const styles = criarEstilos({
         marginBottom: 12,
     },
 
-    historyButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 44, gap: 8 },
+    historyButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 44, marginTop: 10, gap: 8 },
 
     historyButtonText: { color: '#BBFF00', fontSize: 14, fontWeight: '700' },
 

@@ -22,7 +22,7 @@ function mostrarMensagem(titulo, mensagem) {
     else Alert.alert(titulo, mensagem);
 }
 export default function DiarioScreen({ navigation }) {
-    const { usuario } = useContext(AuthContext);
+    const { usuario, revisaoHistoricos } = useContext(AuthContext);
     const idUsuario = usuario.id_usuario;
     const [notes, setNotes] = useState([]);
     const [text, setText] = useState('');
@@ -57,7 +57,7 @@ export default function DiarioScreen({ navigation }) {
             return () => {
                 mounted = false;
             };
-        }, [idUsuario])
+        }, [idUsuario, revisaoHistoricos])
     );
     const handleSave = async () => {
         if (!notesLoaded || saving) return;

@@ -1,7 +1,8 @@
 import { criarEstilos } from '../theme/estilos';
 import { AreaDaTela, Cabecalho, NavegacaoInferior } from '../components/NavegacaoPadrao';
 import { CORES, DEGRADES } from '../theme/tema';
-import { useState, useContext } from 'react';
+import { useState, useContext, useCallback, useRef } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
     View,
     Text,
@@ -19,28 +20,94 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../contexts/AuthContext';
 export default function Perfil({ navigation }) {
-    const { usuario, logout, atualizarNome } = useContext(AuthContext);
-    const nome = usuario.nome || 'Seu Nome';
+    const { usuario, logout, atualizarNome, recarregarPerfil, salvarNotificacoes } = useContext(AuthContext);
+    const nome = usuario?.nome || 'Seu Nome';
     const [nomeEditado, setNomeEditado] = useState(nome);
-    const [notificacoes, setNotificacoes] = useState(true);
+    const [notificacoesPendentes, setNotificacoesPendentes] = useState(null);
     const [modalVisivel, setModalVisivel] = useState(false);
+    const [carregando, setCarregando] = useState(true);
+    const [perfilCarregado, setPerfilCarregado] = useState(false);
+    const [salvando, setSalvando] = useState(null);
+    const [erroPerfil, setErroPerfil] = useState('');
+    const [erroEdicao, setErroEdicao] = useState('');
+    const operacaoEmCurso = useRef(false);
+    const notificacoes = notificacoesPendentes ?? usuario?.st_notificacao ?? false;
+    const ocupado = carregando || salvando !== null || !perfilCarregado;
+
+    const carregarPerfil = useCallback(async () => {
+        if (operacaoEmCurso.current) return;
+
+        operacaoEmCurso.current = true;
+        setCarregando(true);
+        setErroPerfil('');
+
+        try {
+            await recarregarPerfil();
+            setPerfilCarregado(true);
+        } catch {
+            setErroPerfil('Não foi possível carregar seu perfil. Verifique a conexão e tente novamente.');
+        } finally {
+            operacaoEmCurso.current = false;
+            setCarregando(false);
+        }
+    }, [recarregarPerfil]);
+
+    useFocusEffect(useCallback(() => {
+        carregarPerfil();
+    }, [carregarPerfil]));
+
     function abrirEdicao() {
+        if (ocupado || operacaoEmCurso.current) return;
+
         setNomeEditado(nome === 'Seu Nome' ? '' : nome);
+        setErroEdicao('');
         setModalVisivel(true);
     }
+
     async function salvarNome() {
+        if (ocupado || operacaoEmCurso.current) return;
+
         const nomeFinal = nomeEditado.trim();
-        if (!nomeFinal) {
-            Alert.alert('Ops!', 'Digite seu nome antes de salvar.');
+
+        if (!nomeFinal || nomeFinal.length > 100) {
+            setErroEdicao('Informe um nome com até 100 caracteres.');
             return;
         }
+
+        operacaoEmCurso.current = true;
+        setSalvando('nome');
+        setErroEdicao('');
+
         try {
             await atualizarNome(nomeFinal);
             setModalVisivel(false);
         } catch {
-            Alert.alert('Erro', 'Não foi possível salvar o nome. Tente novamente.');
+            setErroEdicao('Não foi possível salvar o nome. Verifique a conexão e tente novamente.');
+        } finally {
+            operacaoEmCurso.current = false;
+            setSalvando(null);
         }
     }
+
+    async function alternarNotificacoes(valor) {
+        if (ocupado || operacaoEmCurso.current) return;
+
+        operacaoEmCurso.current = true;
+        setNotificacoesPendentes(valor);
+        setSalvando('notificacoes');
+        setErroPerfil('');
+
+        try {
+            await salvarNotificacoes(valor);
+        } catch {
+            setErroPerfil('Não foi possível confirmar a alteração das notificações. Verifique a conexão e tente novamente.');
+        } finally {
+            operacaoEmCurso.current = false;
+            setNotificacoesPendentes(null);
+            setSalvando(null);
+        }
+    }
+
     function sairDaConta() {
         const confirmarSaida = async () => {
             try {
@@ -79,12 +146,14 @@ export default function Perfil({ navigation }) {
 
             <AreaDaTela>
                 <View style={styles.content}>
-                    {/* CABEÇALHO SEM O ÍCONE DO CANTO DIREITO */}
+                    {/* CABEÇALHO */}
                     <Cabecalho
-                        titulo="Meu Perfil"
+                        titulo="Seu perfil"
                         navigation={navigation}
                         mostrarPerfil={false}
                         onVoltar={voltar}
+                        onEditar={abrirEdicao}
+                        edicaoDesabilitada={ocupado}
                     />
 
                     <ScrollView
@@ -95,7 +164,7 @@ export default function Perfil({ navigation }) {
                         {/* CARD DO PERFIL */}
                         <LinearGradient colors={DEGRADES.cartao} style={styles.profileCard}>
                             <View style={styles.profileTop}>
-                                <View style={styles.avatar}>
+                                <View style={styles.avatar} accessibilityLabel={`Avatar de ${nome}`}>
                                     <Ionicons name="person-outline" size={43} color={CORES.textoEscuro} />
                                     <View style={styles.avatarBadge}>
                                         <Ionicons name="leaf" size={12} color={CORES.textoEscuro} />
@@ -119,6 +188,10 @@ export default function Perfil({ navigation }) {
                             <TouchableOpacity
                                 style={styles.editProfileButton}
                                 onPress={abrirEdicao}
+                                disabled={ocupado}
+                                accessibilityRole="button"
+                                accessibilityLabel="Editar nome"
+                                accessibilityState={{ disabled: ocupado }}
                                 activeOpacity={0.8}
                             >
                                 <Ionicons name="pencil-outline" size={16} color={CORES.textoEscuro} />
@@ -147,13 +220,16 @@ export default function Perfil({ navigation }) {
                             <View style={styles.settingText}>
                                 <Text style={styles.settingTitle}>Notificações</Text>
                                 <Text style={styles.settingSubtitle}>
-                                    {notificacoes ? 'Lembretes ativados' : 'Lembretes desativados'}
+                                    {carregando ? 'Carregando preferência…' : salvando === 'notificacoes'
+                                        ? 'Salvando preferência…' : notificacoes ? 'Notificações ativadas' : 'Notificações desativadas'}
                                 </Text>
                             </View>
 
                             <Switch
                                 value={notificacoes}
-                                onValueChange={setNotificacoes}
+                                onValueChange={alternarNotificacoes}
+                                disabled={ocupado}
+                                accessibilityState={{ disabled: ocupado, busy: salvando === 'notificacoes' }}
                                 trackColor={{
                                     false: 'rgba(255,255,255,0.25)',
                                     true: '#96C433',
@@ -163,6 +239,20 @@ export default function Perfil({ navigation }) {
                                 accessibilityLabel="Ativar ou desativar notificações"
                             />
                         </LinearGradient>
+
+                        {erroPerfil ? (
+                            <View style={styles.feedback}>
+                                <Text style={styles.feedbackText} accessibilityRole="alert">{erroPerfil}</Text>
+                                <TouchableOpacity
+                                    onPress={carregarPerfil}
+                                    disabled={carregando || salvando !== null}
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Recarregar perfil"
+                                >
+                                    <Text style={styles.retryText}>Tentar novamente</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : null}
 
                         {/* CARD MOTIVACIONAL */}
                         <LinearGradient colors={DEGRADES.cartao} style={styles.messageCard}>
@@ -207,6 +297,8 @@ export default function Perfil({ navigation }) {
                             style={styles.logoutButton}
                             onPress={sairDaConta}
                             activeOpacity={0.8}
+                            accessibilityRole="button"
+                            accessibilityLabel="Sair da conta"
                         >
                             <Ionicons name="log-out-outline" size={20} color="#FF9999" />
                             <Text style={styles.logoutText}>Sair da conta</Text>
@@ -225,7 +317,7 @@ export default function Perfil({ navigation }) {
                 visible={modalVisivel}
                 transparent
                 animationType="fade"
-                onRequestClose={() => setModalVisivel(false)}
+                onRequestClose={() => { if (salvando !== 'nome') setModalVisivel(false); }}
             >
                 <KeyboardAvoidingView
                     style={styles.modalOverlay}
@@ -246,16 +338,34 @@ export default function Perfil({ navigation }) {
                             placeholder="Digite seu nome"
                             placeholderTextColor="#879182"
                             autoFocus
-                            maxLength={40}
+                            maxLength={100}
+                            editable={salvando !== 'nome'}
+                            accessibilityLabel="Nome do perfil"
                             returnKeyType="done"
                             onSubmitEditing={salvarNome}
                         />
 
-                        <TouchableOpacity style={styles.saveButton} onPress={salvarNome} activeOpacity={0.8}>
-                            <Text style={styles.saveButtonText}>Salvar alterações</Text>
+                        {erroEdicao ? <Text style={styles.editError} accessibilityRole="alert">{erroEdicao}</Text> : null}
+
+                        <TouchableOpacity
+                            style={styles.saveButton}
+                            onPress={salvarNome}
+                            activeOpacity={0.8}
+                            disabled={salvando === 'nome'}
+                            accessibilityRole="button"
+                            accessibilityLabel="Salvar alterações"
+                            accessibilityState={{ disabled: salvando === 'nome', busy: salvando === 'nome' }}
+                        >
+                            <Text style={styles.saveButtonText}>{salvando === 'nome' ? 'Salvando…' : 'Salvar alterações'}</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisivel(false)}>
+                        <TouchableOpacity
+                            style={styles.cancelButton}
+                            onPress={() => setModalVisivel(false)}
+                            disabled={salvando === 'nome'}
+                            accessibilityRole="button"
+                            accessibilityLabel="Cancelar edição"
+                        >
                             <Text style={styles.cancelButtonText}>Cancelar</Text>
                         </TouchableOpacity>
                     </View>
@@ -265,6 +375,28 @@ export default function Perfil({ navigation }) {
     );
 }
 const styles = criarEstilos({
+    feedback: {
+        marginTop: 12,
+        padding: 14,
+        borderRadius: 16,
+        backgroundColor: CORES.textoEscuro,
+    },
+    feedbackText: {
+        color: CORES.textoSuave,
+        fontSize: 13,
+        lineHeight: 19,
+    },
+    retryText: {
+        color: CORES.icone,
+        fontWeight: '700',
+        paddingTop: 12,
+    },
+    editError: {
+        color: '#8C2424',
+        fontSize: 13,
+        lineHeight: 19,
+        marginTop: 12,
+    },
     container: {
         flex: 1,
     },

@@ -75,7 +75,7 @@ function AjusteMeta({ titulo, valor, onChange, minimo, maximo, disabled }) {
     );
 }
 export default function SonoScreen({ navigation }) {
-    const { usuario } = useContext(AuthContext);
+    const { usuario, revisaoHistoricos } = useContext(AuthContext);
     const [dados, setDados] = useState(null);
     const [carregando, setCarregando] = useState(true);
     const [erro, setErro] = useState('');
@@ -123,7 +123,7 @@ export default function SonoScreen({ navigation }) {
                 if (estado === 'active') carregar();
             });
             return () => listener.remove();
-        }, [carregar])
+        }, [carregar, revisaoHistoricos])
     );
     useEffect(() => {
         if (!dados) return;

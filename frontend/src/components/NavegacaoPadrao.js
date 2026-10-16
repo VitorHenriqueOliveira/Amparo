@@ -18,7 +18,7 @@ export function AreaDaTela({ children }) {
     return <SafeAreaView style={styles.area}>{children}</SafeAreaView>;
 }
 
-export function Cabecalho({ titulo, navigation, marca = false, mostrarPerfil = true, onVoltar }) {
+export function Cabecalho({ titulo, navigation, marca = false, mostrarPerfil = true, onVoltar, onEditar, edicaoDesabilitada = false }) {
     const voltar = () => {
         if (onVoltar) onVoltar();
         else if (navigation?.canGoBack()) navigation.goBack();
@@ -49,7 +49,19 @@ export function Cabecalho({ titulo, navigation, marca = false, mostrarPerfil = t
             <Text style={styles.titulo} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
                 {titulo}
             </Text>
-            {mostrarPerfil ? (
+            {onEditar ? (
+                <TouchableOpacity
+                    onPress={onEditar}
+                    disabled={edicaoDesabilitada}
+                    style={styles.lateral}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Editar perfil"
+                    accessibilityState={{ disabled: edicaoDesabilitada }}
+                >
+                    <Ionicons name="pencil-outline" size={MEDIDAS.tamanhoIcone} color={CORES.icone} />
+                </TouchableOpacity>
+            ) : mostrarPerfil ? (
                 <TouchableOpacity
                     onPress={() => navigation.navigate('Perfil')}
                     style={styles.lateral}
