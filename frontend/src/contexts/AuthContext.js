@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect } from 'react';
 import { AppState } from 'react-native';
 import { observarFalhaAutenticacao } from '../services/api';
 import { sincronizarCiclosCalma } from '../services/calma';
+import { atualizarPerfil } from '../services/usuario';
 import {
     restaurarSessao,
     iniciarSessao,
@@ -109,7 +110,7 @@ export function AuthProvider({ children }) {
     }
 
     async function atualizarNome(nome) {
-        const atualizado = { ...usuario, nome };
+        const atualizado = await atualizarPerfil(nome);
 
         await salvarUsuario(atualizado);
         setUsuario(atualizado);

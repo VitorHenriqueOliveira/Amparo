@@ -42,8 +42,8 @@
     },
     "devDependencies": {
         "@types/react": "~19.2.2",
-        "typescript": "~6.0.3",
-        "patch-package": "^8.0.1"
+        "patch-package": "^8.0.1",
+        "typescript": "~6.0.3"
     },
     "overrides": {
         "metro@0.84.4": {

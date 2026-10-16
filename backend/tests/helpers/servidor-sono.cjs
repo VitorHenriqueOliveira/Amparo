@@ -6,14 +6,8 @@ const { PGlite } = require('@electric-sql/pglite');
 
 async function criarAmbienteSono(porta = 0) {
     const banco = new PGlite();
-    await banco.exec(
-        "CREATE TABLE usuario (id_usuario SERIAL PRIMARY KEY, nome TEXT NOT NULL, email TEXT UNIQUE NOT NULL," +
-        "senha TEXT NOT NULL, data_registro TIMESTAMPTZ NOT NULL DEFAULT now());" +
-        "CREATE TABLE diario (id_diario SERIAL PRIMARY KEY, id_usuario INTEGER NOT NULL REFERENCES usuario," +
-        "descricao TEXT NOT NULL, data_registro TIMESTAMPTZ NOT NULL DEFAULT now());"
-    );
-    for (const nome of ['002_calma_historico.sql', '003_registro_emocional.sql',
-        '005_integridade_registro_emocional.sql', '006_registro_sono.sql']) {
+    for (const nome of ['001_estrutura_inicial.sql', '002_calma_historico.sql',
+        '003_registro_emocional.sql', '004_integridade_dos_registros.sql', '006_registro_sono.sql']) {
         await banco.exec(fs.readFileSync(path.join(__dirname, '../../migrations', nome), 'utf8'));
     }
     const hash = await require('bcrypt').hash('teste1234', 10);

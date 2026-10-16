@@ -97,6 +97,28 @@ router.post('/login', async (req, res) => {
     }
 });
 
+router.put('/perfil', verificarToken, async (req, res) => {
+    const nome = typeof req.body?.nome === 'string' ? req.body.nome.trim() : '';
+
+    if (!nome || nome.length > 100 || Object.keys(req.body).some((campo) => campo !== 'nome')) {
+        return res.status(400).json({ erro: 'Informe um nome com até 100 caracteres.' });
+    }
+
+    try {
+        const usuarios = await sql`
+            UPDATE usuario SET nome = ${nome}
+            WHERE id_usuario = ${req.id_usuario_logado}
+            RETURNING id_usuario, nome, email
+        `;
+
+        if (!usuarios.length) return res.status(401).json({ erro: 'Sessão inválida.' });
+
+        return res.json({ usuario: usuarios[0] });
+    } catch {
+        return res.status(500).json({ erro: 'Não foi possível atualizar o perfil.' });
+    }
+});
+
 // Confirma a sessão restaurada no servidor, sem devolver senha ou hash.
 router.get('/sessao', verificarToken, async (req, res) => {
     try {

@@ -5,7 +5,10 @@
     "main": "index.js",
     "type": "module",
     "scripts": {
-        "test": "node --experimental-vm-modules --test tests/*.test.cjs"
+        "test": "node --experimental-vm-modules --test tests/*.test.cjs",
+        "db:audit": "node scripts/auditar-banco.js",
+        "db:check": "node scripts/migrar-banco.js",
+        "db:migrate": "node scripts/migrar-banco.js --apply"
     },
     "keywords": [],
     "author": "",

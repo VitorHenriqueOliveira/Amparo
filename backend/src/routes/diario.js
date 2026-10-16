@@ -3,7 +3,7 @@ import sql from '../db.js';
 import verificarToken from '../middlewares/auth.js';
 
 const router = express.Router();
-router.use(verificarToken);
+router.use('/diario', verificarToken);
 
 function idValido(valor) {
     return /^\d+$/.test(String(valor)) && Number.isSafeInteger(Number(valor)) && Number(valor) > 0;
@@ -21,7 +21,7 @@ router.get('/diario/:id_usuario', async (req, res) => {
         return res.status(403).json({ erro: 'Você não tem permissão para ver as notas de outro usuário.' });
     }
     try {
-        const notas = await sql`SELECT id_diario, descricao, data_registro FROM diario WHERE id_usuario = ${req.id_usuario_logado} ORDER BY data_registro DESC`;
+        const notas = await sql`SELECT id_diario, descricao, data_registro FROM diario WHERE id_usuario = ${req.id_usuario_logado} ORDER BY data_registro DESC, id_diario DESC`;
         return res.json(notas);
     } catch {
         return res.status(500).json({ erro: 'Erro ao buscar notas.' });
