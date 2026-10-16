@@ -139,3 +139,54 @@ test('a cadeia completa atualiza a chave antiga sem perder os registros', async 
     assert.equal((await banco.query('SELECT id_registro_emocao FROM registro_emocional')).rows[0].id_registro_emocao, 1);
     assert.equal((await banco.query("SELECT descricao FROM emocao WHERE id_emocao = 'Feliz'")).rows[0].descricao, 'Descrição original');
 });
+
+test('preferências do perfil preservam usuários e históricos e mantêm a escolha ao reaplicar', async (t) => {
+    const { banco, migracoes } = await preparar(t, 6);
+    const { criarValidacao, salvarImpressoes, conferirImpressoes } = await import('../scripts/preservar-registros.js');
+
+    await banco.exec(`
+        INSERT INTO usuario (nome, email, senha) VALUES ('Exemplo', 'exemplo@example.com', 'hash');
+        INSERT INTO diario (id_usuario, descricao) VALUES (1, 'Texto preservado');
+        INSERT INTO registro_emocional (id_usuario, id_emocao) VALUES (1, 'Feliz');
+        INSERT INTO sono (id_usuario, hora_dormiu, hora_acordou, data_registro) VALUES (1, '22:00', '06:00', '2026-10-15');
+        INSERT INTO calma_historico (id_usuario, id_cliente, concluido_em, duracao_segundos)
+            VALUES (1, 'c0b91490-11f5-4696-8bfd-968e21b87bba', now(), 14);
+    `);
+
+    await banco.transaction(async (tx) => {
+        await tx.exec(criarValidacao);
+        for (const comando of salvarImpressoes) await tx.exec(comando);
+        for (const comando of migracoes[6].comandos) await tx.exec(comando);
+        for (const comando of conferirImpressoes) await tx.exec(comando);
+    });
+
+    assert.equal((await banco.query('SELECT st_notificacao FROM usuario')).rows[0].st_notificacao, true);
+    await banco.exec('UPDATE usuario SET st_notificacao = FALSE');
+    for (const comando of migracoes[6].comandos) await banco.exec(comando);
+    assert.equal((await banco.query('SELECT st_notificacao FROM usuario')).rows[0].st_notificacao, false);
+    await assert.rejects(banco.exec('UPDATE usuario SET st_notificacao = NULL'), (erro) => erro.code === '23502');
+    await banco.exec("INSERT INTO usuario (nome, email, senha) VALUES ('Novo', 'novo@example.com', 'hash');");
+    assert.equal((await banco.query('SELECT st_notificacao FROM usuario WHERE id_usuario = 2')).rows[0].st_notificacao, true);
+});
+
+test('recibos de importação são aditivos, reaplicáveis e confirmados na mesma transação do registro', async (t) => {
+    const { banco, migracoes } = await preparar(t, 7);
+    await banco.exec(`INSERT INTO usuario (nome, email, senha) VALUES ('Exemplo', 'exemplo@example.com', 'hash');
+        INSERT INTO diario (id_usuario, descricao) VALUES (1, 'Texto preservado');`);
+    const { criarValidacao, salvarImpressoes, conferirImpressoes } = await import('../scripts/preservar-registros.js');
+    await banco.transaction(async (tx) => {
+        await tx.exec(criarValidacao);
+        for (const comando of salvarImpressoes) await tx.exec(comando);
+        for (const comando of migracoes[7].comandos) await tx.exec(comando);
+        for (const comando of conferirImpressoes) await tx.exec(comando);
+    });
+    assert.equal((await banco.query('SELECT descricao FROM diario')).rows[0].descricao, 'Texto preservado');
+    const importar = `SELECT * FROM importar_historico_legado(1, 'diario', repeat('a', 64), repeat('b', 64), $1::jsonb)`;
+    // A validação do banco falha depois da tentativa de criar o recibo.
+    await assert.rejects(banco.query(importar, [JSON.stringify({ descricao: ' ', registrado_em: '2025-09-03T02:30:00Z' })]));
+    assert.equal((await banco.query('SELECT count(*)::int AS total FROM importacao_historico')).rows[0].total, 0);
+    await banco.query(importar, [JSON.stringify({ descricao: 'Importado', registrado_em: '2025-09-03T02:30:00Z' })]);
+    for (const comando of migracoes[7].comandos) await banco.exec(comando);
+    assert.equal((await banco.query('SELECT count(*)::int AS total FROM importacao_historico')).rows[0].total, 1);
+    assert.equal((await banco.query('SELECT count(*)::int AS total FROM diario')).rows[0].total, 2);
+});

@@ -8,6 +8,7 @@ import rotasCalma from './routes/calma.js';
 import rotasEmocoes from './routes/emocoes.js';
 import rotasSono from './routes/sono.js';
 import rotasEvolucao from './routes/evolucao.js';
+import rotasHistoricos from './routes/historicos.js';
 
 // Separa a configuração da API da abertura da porta para permitir testes.
 export function criarApp({ origensPermitidas, proxiesConfiaveis = 0 }) {
@@ -64,6 +65,7 @@ export function criarApp({ origensPermitidas, proxiesConfiaveis = 0 }) {
     app.use('/api', rotasEvolucao);
     app.use('/api', rotasSono);
     app.use('/api', rotasDiario);
+    app.use('/api', rotasHistoricos);
 
     app.use((req, res) => {
         res.status(404).json({ erro: 'Rota não encontrada.' });

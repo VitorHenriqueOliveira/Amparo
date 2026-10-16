@@ -37,6 +37,7 @@ async function criarServidor(t, protecoes = false) {
         'express-rate-limit': { rateLimit: require('express-rate-limit').rateLimit },
         jsonwebtoken: { default: jwt },
         bcrypt: { default: bcrypt },
+        'node:crypto': { createHash: require('node:crypto').createHash },
         '../db.js': { default: sql },
     };
 

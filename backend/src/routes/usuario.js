@@ -66,7 +66,7 @@ router.post('/login', async (req, res) => {
 
     try {
         const usuarios = await sql`
-            SELECT id_usuario, nome, email, senha
+            SELECT id_usuario, nome, email, senha, st_notificacao
             FROM usuario
             WHERE lower(trim(email)) = ${emailNormalizado}
         `;
@@ -87,7 +87,7 @@ router.post('/login', async (req, res) => {
         });
 
         return res.json({
-            usuario: { id_usuario: usuario.id_usuario, nome: usuario.nome, email: usuario.email },
+            usuario: { id_usuario: usuario.id_usuario, nome: usuario.nome, email: usuario.email, st_notificacao: usuario.st_notificacao },
             token,
         });
     } catch {
@@ -108,7 +108,7 @@ router.put('/perfil', verificarToken, async (req, res) => {
         const usuarios = await sql`
             UPDATE usuario SET nome = ${nome}
             WHERE id_usuario = ${req.id_usuario_logado}
-            RETURNING id_usuario, nome, email
+            RETURNING id_usuario, nome, email, st_notificacao
         `;
 
         if (!usuarios.length) return res.status(401).json({ erro: 'Sessão inválida.' });
@@ -119,11 +119,33 @@ router.put('/perfil', verificarToken, async (req, res) => {
     }
 });
 
-// Confirma a sessão restaurada no servidor, sem devolver senha ou hash.
-router.get('/sessao', verificarToken, async (req, res) => {
+router.put('/perfil/notificacoes', verificarToken, async (req, res) => {
+    const notificacoes = req.body?.st_notificacao;
+
+    if (typeof notificacoes !== 'boolean' || Object.keys(req.body).some((campo) => campo !== 'st_notificacao')) {
+        return res.status(400).json({ erro: 'Informe se as notificações devem estar ativadas ou desativadas.' });
+    }
+
     try {
         const usuarios = await sql`
-            SELECT id_usuario, nome, email
+            UPDATE usuario SET st_notificacao = ${notificacoes}
+            WHERE id_usuario = ${req.id_usuario_logado}
+            RETURNING id_usuario, nome, email, st_notificacao
+        `;
+
+        if (!usuarios.length) return res.status(401).json({ erro: 'Sessão inválida.' });
+
+        return res.json({ usuario: usuarios[0] });
+    } catch {
+        return res.status(500).json({ erro: 'Não foi possível atualizar as notificações.' });
+    }
+});
+
+// O perfil e a sessão consultam exclusivamente a conta identificada pelo JWT.
+router.get(['/sessao', '/perfil'], verificarToken, async (req, res) => {
+    try {
+        const usuarios = await sql`
+            SELECT id_usuario, nome, email, st_notificacao
             FROM usuario
             WHERE id_usuario = ${req.id_usuario_logado}
         `;
@@ -135,7 +157,7 @@ router.get('/sessao', verificarToken, async (req, res) => {
         const usuario = usuarios[0];
 
         return res.json({
-            usuario: { id_usuario: usuario.id_usuario, nome: usuario.nome, email: usuario.email },
+            usuario: { id_usuario: usuario.id_usuario, nome: usuario.nome, email: usuario.email, st_notificacao: usuario.st_notificacao },
         });
     } catch {
         console.error('Erro ao verificar sessão.');
