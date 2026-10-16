@@ -1,0 +1,75 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env
+.env.*
+!.env.example
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+example
+
+# generated native folders
+/ios
+/android
+
+# Frontend: configuração local da API
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# Documentação e preferências locais dos agentes
+/Agents/*
+
+# Artefatos e credenciais de build
+*.apk
+*.aab
+credentials.json
+/builds/
+/frontend/android/
+/frontend/ios/
+
+# A build do aplicativo usa apenas o frontend.
+/backend/
+/Agents/
+/.agents/
+/.codex/
+/.claude/
+/.vscode/
+/.aws/
+AGENTS.md
+CLAUDE.md
+/render.yaml
+/frontend/tests/

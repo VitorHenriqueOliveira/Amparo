@@ -52,3 +52,11 @@ frontend/.env.*
 
 # Documentação e preferências locais dos agentes
 /Agents/*
+
+# Artefatos e credenciais de build
+*.apk
+*.aab
+credentials.json
+/builds/
+/frontend/android/
+/frontend/ios/

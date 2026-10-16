@@ -9,7 +9,8 @@ if (!__DEV__ && !enderecoApi.startsWith('https://')) {
 
 const api = axios.create({
     baseURL: enderecoApi,
-    timeout: 15000,
+    // A API gratuita pode precisar de mais tempo na primeira conexão após ficar ociosa.
+    timeout: Number(process.env.EXPO_PUBLIC_API_TIMEOUT_MS || 15000),
 });
 
 const ouvintes = new Set();

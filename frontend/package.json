@@ -58,7 +58,9 @@
         "web": "expo start --web",
         "lint": "expo lint",
         "test": "node --experimental-vm-modules --test tests/*.test.cjs",
-        "postinstall": "patch-package --error-on-fail"
+        "postinstall": "patch-package --error-on-fail",
+        "eas-build-pre-install": "node scripts/validar-build.cjs",
+        "build:android:teste": "npx --yes eas-cli@25.0.0 build --platform android --profile preview"
     },
     "private": true
 }
