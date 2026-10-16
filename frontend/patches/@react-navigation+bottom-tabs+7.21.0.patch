@@ -1,8 +1,7 @@
 diff --git a/node_modules/@react-navigation/bottom-tabs/lib/module/views/BottomTabBar.js b/node_modules/@react-navigation/bottom-tabs/lib/module/views/BottomTabBar.js
-index 4d2356f..8cd69f2 100644
 --- a/node_modules/@react-navigation/bottom-tabs/lib/module/views/BottomTabBar.js
 +++ b/node_modules/@react-navigation/bottom-tabs/lib/module/views/BottomTabBar.js
-@@ -252,12 +252,10 @@ export function BottomTabBar({
+@@ -252,12 +252,10 @@
        paddingBottom: tabBarPosition === 'bottom' ? insets.bottom : 0,
        paddingTop: tabBarPosition === 'top' ? insets.top : 0,
        paddingHorizontal: Math.max(insets.left, insets.right)
@@ -18,17 +17,14 @@ index 4d2356f..8cd69f2 100644
      }), /*#__PURE__*/_jsx(View, {
        role: "tablist",
 diff --git a/node_modules/@react-navigation/bottom-tabs/lib/module/views/BottomTabView.js b/node_modules/@react-navigation/bottom-tabs/lib/module/views/BottomTabView.js
-index c9496b2..4b0e2f3 100644
 --- a/node_modules/@react-navigation/bottom-tabs/lib/module/views/BottomTabView.js
 +++ b/node_modules/@react-navigation/bottom-tabs/lib/module/views/BottomTabView.js
-@@ -258,13 +258,13 @@ const TabScene = /*#__PURE__*/React.memo(function TabScene({
-   : STATE_INACTIVE;
+@@ -259,12 +259,11 @@
    return /*#__PURE__*/_jsx(MaybeScreen, {
      style: [StyleSheet.absoluteFill, {
--      zIndex: isFocused ? 0 : -1
-+      zIndex: isFocused ? 0 : -1,
-+      pointerEvents: isFocused ? 'box-none' : 'none'
-     }],
+       zIndex: isFocused ? 0 : -1
+-    }],
++    }, isFocused ? styles.sceneAtiva : styles.sceneInativa],
      active: activityState,
      enabled: detachInactiveScreens,
      freezeOnBlur: freezeOnBlur,
@@ -37,11 +33,28 @@ index c9496b2..4b0e2f3 100644
      children: /*#__PURE__*/_jsx(BottomTabBarHeightContext.Provider, {
        value: tabBarHeight,
        children: /*#__PURE__*/_jsx(Screen, {
+@@ -287,9 +286,15 @@
+   });
+ });
+ const styles = StyleSheet.create({
++  sceneAtiva: {
++    pointerEvents: 'box-none'
++  },
++  sceneInativa: {
++    pointerEvents: 'none'
++  },
+   screens: {
+     flex: 1,
+     overflow: 'hidden'
+   }
+ });
+-//# sourceMappingURL=BottomTabView.js.map
+\ No newline at end of file
++//# sourceMappingURL=BottomTabView.js.map
 diff --git a/node_modules/@react-navigation/bottom-tabs/src/views/BottomTabBar.tsx b/node_modules/@react-navigation/bottom-tabs/src/views/BottomTabBar.tsx
-index f0385a9..96b627b 100644
 --- a/node_modules/@react-navigation/bottom-tabs/src/views/BottomTabBar.tsx
 +++ b/node_modules/@react-navigation/bottom-tabs/src/views/BottomTabBar.tsx
-@@ -387,11 +387,11 @@ export function BottomTabBar({
+@@ -387,11 +387,11 @@
                },
              ],
          tabBarStyle,
@@ -56,15 +69,14 @@ index f0385a9..96b627b 100644
        </View>
        <View
 diff --git a/node_modules/@react-navigation/bottom-tabs/src/views/BottomTabView.tsx b/node_modules/@react-navigation/bottom-tabs/src/views/BottomTabView.tsx
-index 009b05c..83c873e 100644
 --- a/node_modules/@react-navigation/bottom-tabs/src/views/BottomTabView.tsx
 +++ b/node_modules/@react-navigation/bottom-tabs/src/views/BottomTabView.tsx
-@@ -382,12 +382,11 @@ const TabScene = React.memo(function TabScene({
+@@ -382,12 +382,11 @@
  
    return (
      <MaybeScreen
 -      style={[StyleSheet.absoluteFill, { zIndex: isFocused ? 0 : -1 }]}
-+      style={[StyleSheet.absoluteFill, { zIndex: isFocused ? 0 : -1, pointerEvents: isFocused ? 'box-none' : 'none' }]}
++      style={[StyleSheet.absoluteFill, { zIndex: isFocused ? 0 : -1 }, isFocused ? styles.sceneAtiva : styles.sceneInativa]}
        active={activityState}
        enabled={detachInactiveScreens}
        freezeOnBlur={freezeOnBlur}
@@ -73,3 +85,16 @@ index 009b05c..83c873e 100644
      >
        <BottomTabBarHeightContext.Provider value={tabBarHeight}>
          <Screen
+@@ -414,6 +413,12 @@
+ });
+ 
+ const styles = StyleSheet.create({
++  sceneAtiva: {
++    pointerEvents: 'box-none',
++  },
++  sceneInativa: {
++    pointerEvents: 'none',
++  },
+   screens: {
+     flex: 1,
+     overflow: 'hidden',
