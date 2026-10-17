@@ -164,9 +164,11 @@ Mantenha os terminais do backend e do Expo abertos enquanto estiver utilizando e
 
 ### Baixar o aplicativo
 
-Abra o link abaixo pelo celular:
+Abra a pré-release pelo celular e baixe o arquivo APK na seção **Assets**:
 
-[Baixar Amparo para Android](https://expo.dev/artifacts/eas/ocpmTn3lIStzUIf0fs0YVq2OdceP8Lk56aL9GayneQ4.apk)
+[Acessar a pré-release v1.0.0-beta.1](https://github.com/VitorHenriqueOliveira/Amparo/releases/tag/v1.0.0-beta.1)
+
+Se preferir, [baixe o APK diretamente](https://github.com/VitorHenriqueOliveira/Amparo/releases/download/v1.0.0-beta.1/amparo-1.0.0-teste-v3.apk).
 
 **Versão disponível:** 1.0.0 (build 3).
 
