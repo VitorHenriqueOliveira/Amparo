@@ -133,16 +133,6 @@ export default function LoginScreen({ navigation }) {
                             </View>
 
                             {/* FORMULÁRIO */}
-                            <TouchableOpacity
-                                style={styles.calmaButton}
-                                onPress={() => navigation.navigate('CalmaUrgente')}
-                                accessibilityRole="button"
-                                accessibilityLabel="Abrir Calma Urgente sem login"
-                            >
-                                <Ionicons name="leaf-outline" size={22} color="#BBFF00" />
-                                <Text style={styles.calmaButtonText}>Calma Urgente</Text>
-                            </TouchableOpacity>
-
                             <View style={styles.formContainer}>
                                 {/* EMAIL */}
                                 <View style={styles.inputWrapper}>
@@ -256,13 +246,13 @@ const styles = criarEstilos({
     // SOL ANIMADO IGUAL AO DA HOME
     logoContainer: {
         alignItems: 'center',
-        marginBottom: 24,
+        marginBottom: 90,
     },
     logoContainerCompacto: {
         flexDirection: 'row',
         justifyContent: 'center',
         gap: 12,
-        marginBottom: 20,
+        marginBottom: 84,
     },
     sunGlow: {
         width: 126,
@@ -315,23 +305,6 @@ const styles = criarEstilos({
         textAlign: 'center',
     },
     // FORMULÁRIO
-    calmaButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        minHeight: 48,
-        paddingHorizontal: 20,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: '#BBFF00',
-        borderRadius: 24,
-    },
-    calmaButtonText: {
-        color: '#BBFF00',
-        fontWeight: '700',
-        fontSize: 16,
-    },
     formContainer: {
         width: '100%',
         alignItems: 'center',

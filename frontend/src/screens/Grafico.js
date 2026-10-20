@@ -16,21 +16,25 @@ const EMOCOES = {
     feliz: {
         titulo: 'Feliz',
         cor: '#A7D64F',
+        corIcone: '#D5FF73',
         icone: 'sunny-outline',
     },
     triste: {
         titulo: 'Triste',
         cor: '#527D28',
+        corIcone: '#BDE868',
         icone: 'rainy-outline',
     },
     neutro: {
         titulo: 'Neutro',
         cor: '#D4E99B',
+        corIcone: '#F0FCCE',
         icone: 'cloud-outline',
     },
     raiva: {
         titulo: 'Raiva',
         cor: '#31551D',
+        corIcone: '#A7D64F',
         icone: 'thunderstorm-outline',
     },
 };
@@ -415,10 +419,10 @@ export default function GraficoScreen({ navigation }) {
                                                     styles.dayEmotionCircle,
                                                     {
                                                         backgroundColor: emocao
-                                                            ? `${emocao.cor}35`
+                                                            ? `${emocao.cor}66`
                                                             : 'rgba(255,255,255,0.06)',
                                                         borderColor: emocao
-                                                            ? emocao.cor
+                                                            ? 'rgba(255,255,255,0.30)'
                                                             : 'rgba(255,255,255,0.16)',
                                                     },
                                                 ]}
@@ -426,7 +430,7 @@ export default function GraficoScreen({ navigation }) {
                                                 <Ionicons
                                                     name={emocao ? emocao.icone : 'remove-outline'}
                                                     size={24}
-                                                    color={emocao ? emocao.cor : '#A2B68C'}
+                                                    color={emocao ? emocao.corIcone : '#A2B68C'}
                                                 />
                                             </View>
 

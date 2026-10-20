@@ -176,7 +176,7 @@ Se preferir, [baixe o APK diretamente](https://github.com/VitorHenriqueOliveira/
 
 1. Abra o arquivo APK baixado e conclua a instalação no Android.
 2. Abra o aplicativo **Amparo (Teste)**.
-3. Entre com sua conta ou acesse o **Modo Calma Urgente** pela tela de login.
+3. Entre com sua conta.
 
 Se já tiver a versão anterior instalada, instale esta atualização por cima dela.
 
