@@ -2,13 +2,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { createRequire } = require('node:module');
 const { execFileSync } = require('node:child_process');
 const { getAssetSize } = require('metro/private/Assets');
 const xcode = require('xcode');
+const certificados = require('@expo/code-signing-certificates');
+const forge = require('node-forge');
 
 const raiz = path.join(__dirname, '..');
-const requireDoXcode = createRequire(require.resolve('xcode'));
 
 // Preserva a leitura de imagens usada pelo Metro após atualizar as dependências.
 test('Metro lê as dimensões dos PNGs do projeto', () => {
@@ -43,12 +43,29 @@ test('Xcode continua gerando identificadores válidos para o projeto iOS', () =>
     }
 });
 
-test('UUID rejeita escrita fora dos limites do buffer', () => {
-    const { v5 } = requireDoXcode('uuid');
+test('certificados do Expo aceitam PEM em Buffer e validam assinaturas sem aceitar conteúdo alterado', () => {
+    // Chaves de teste ficam somente na memória e não são usadas no aplicativo.
+    const chaves = certificados.generateKeyPair();
+    const certificado = certificados.generateSelfSignedCodeSigningCertificate({
+        keyPair: chaves,
+        validityNotBefore: new Date(Date.now() - 60000),
+        validityNotAfter: new Date(Date.now() + 3600000),
+        commonName: 'Teste local do Amparo',
+    });
+    certificados.validateSelfSignedCertificate(certificado, chaves);
 
-    assert.throws(() => {
-        v5('teste', v5.DNS, new Uint8Array(8), 4);
-    }, RangeError);
+    const pem = certificados.convertCertificateToCertificatePEM(certificado);
+    assert.equal(forge.pem.decode(Buffer.from(pem))[0].type, 'CERTIFICATE');
+    const recuperado = certificados.convertCertificatePEMToCertificate(pem);
+    const conteudo = Buffer.from('Manifesto de teste do Amparo');
+    const assinatura = certificados.signBufferRSASHA256AndVerify(chaves.privateKey, recuperado, conteudo);
+    const verificar = (texto) => recuperado.publicKey.verify(
+        forge.md.sha256.create().update(texto).digest().getBytes(),
+        Buffer.from(assinatura, 'base64').toString('binary')
+    );
+
+    assert.equal(verificar(conteudo.toString()), true);
+    assert.equal(verificar('Manifesto alterado'), false);
 });
 
 function caixa(tipo, conteudo, tamanho = conteudo.length + 8) {
