@@ -10,7 +10,7 @@ const router = express.Router();
 const hashParaUsuarioAusente = bcrypt.hashSync('comparacao-interna-sem-conta', 10);
 
 function emailValido(email) {
-    return typeof email === 'string' && email.length <= 150 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    return typeof email === 'string' && email.length <= 150 && !email.includes('\u0000') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function senhaValida(senha, cadastro = false) {
@@ -18,13 +18,28 @@ function senhaValida(senha, cadastro = false) {
     return typeof senha === 'string' && senha.length >= (cadastro ? 8 : 1) && Buffer.byteLength(senha) <= 72;
 }
 
+function dadosPublicos(usuario) {
+    return {
+        id_usuario: usuario.id_usuario, nome: usuario.nome, email: usuario.email,
+        st_notificacao: usuario.st_notificacao,
+        foto_url: usuario.foto_versao ? '/api/perfil/foto?v=' + usuario.foto_versao : null,
+    };
+}
+
 // Cadastro: valida os dados antes de consultar ou alterar o banco.
 router.post('/usuario', async (req, res) => {
-    const { nome, email, senha } = req.body || {};
+    // Identificação, preferências e permissões são definidas pelo servidor.
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body) ||
+        Object.keys(req.body).some((campo) => !['nome', 'email', 'senha'].includes(campo))) {
+        return res.status(400).json({ erro: 'Envie somente nome, e-mail e senha para cadastrar sua conta.' });
+    }
+
+    const { nome, email, senha } = req.body;
     const nomeNormalizado = typeof nome === 'string' ? nome.trim() : '';
     const emailNormalizado = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
-    if (!nomeNormalizado || nomeNormalizado.length > 100 || !emailValido(emailNormalizado) || !senhaValida(senha, true)) {
+    if (!nomeNormalizado || nomeNormalizado.length > 100 || nomeNormalizado.includes('\u0000') ||
+        !emailValido(emailNormalizado) || !senhaValida(senha, true)) {
         return res.status(400).json({ erro: 'Informe nome, e-mail e senha válidos. A senha deve ter pelo menos 8 caracteres e no máximo 72 bytes.' });
     }
 
@@ -66,7 +81,8 @@ router.post('/login', async (req, res) => {
 
     try {
         const usuarios = await sql`
-            SELECT id_usuario, nome, email, senha, st_notificacao
+            SELECT id_usuario, nome, email, senha, st_notificacao,
+                (SELECT versao FROM usuario_foto WHERE id_usuario = usuario.id_usuario) AS foto_versao
             FROM usuario
             WHERE lower(trim(email)) = ${emailNormalizado}
         `;
@@ -87,7 +103,7 @@ router.post('/login', async (req, res) => {
         });
 
         return res.json({
-            usuario: { id_usuario: usuario.id_usuario, nome: usuario.nome, email: usuario.email, st_notificacao: usuario.st_notificacao },
+            usuario: dadosPublicos(usuario),
             token,
         });
     } catch {
@@ -108,12 +124,13 @@ router.put('/perfil', verificarToken, async (req, res) => {
         const usuarios = await sql`
             UPDATE usuario SET nome = ${nome}
             WHERE id_usuario = ${req.id_usuario_logado}
-            RETURNING id_usuario, nome, email, st_notificacao
+            RETURNING id_usuario, nome, email, st_notificacao,
+                (SELECT versao FROM usuario_foto WHERE id_usuario = usuario.id_usuario) AS foto_versao
         `;
 
         if (!usuarios.length) return res.status(401).json({ erro: 'Sessão inválida.' });
 
-        return res.json({ usuario: usuarios[0] });
+        return res.json({ usuario: dadosPublicos(usuarios[0]) });
     } catch {
         return res.status(500).json({ erro: 'Não foi possível atualizar o perfil.' });
     }
@@ -128,14 +145,23 @@ router.put('/perfil/notificacoes', verificarToken, async (req, res) => {
 
     try {
         const usuarios = await sql`
-            UPDATE usuario SET st_notificacao = ${notificacoes}
-            WHERE id_usuario = ${req.id_usuario_logado}
-            RETURNING id_usuario, nome, email, st_notificacao
+            WITH conta AS (
+                UPDATE usuario SET st_notificacao = ${notificacoes}
+                WHERE id_usuario = ${req.id_usuario_logado}
+                RETURNING id_usuario, nome, email, st_notificacao,
+                    (SELECT versao FROM usuario_foto WHERE id_usuario = usuario.id_usuario) AS foto_versao
+            ), cancelados AS (
+                UPDATE notificacao_envio e SET estado = 'cancelado', atualizado_em = statement_timestamp()
+                FROM notificacao_lembrete l, conta c
+                WHERE l.id_usuario = c.id_usuario AND e.id_lembrete = l.id_lembrete
+                    AND NOT c.st_notificacao AND e.estado = 'pendente'
+            )
+            SELECT * FROM conta
         `;
 
         if (!usuarios.length) return res.status(401).json({ erro: 'Sessão inválida.' });
 
-        return res.json({ usuario: usuarios[0] });
+        return res.json({ usuario: dadosPublicos(usuarios[0]) });
     } catch {
         return res.status(500).json({ erro: 'Não foi possível atualizar as notificações.' });
     }
@@ -145,7 +171,8 @@ router.put('/perfil/notificacoes', verificarToken, async (req, res) => {
 router.get(['/sessao', '/perfil'], verificarToken, async (req, res) => {
     try {
         const usuarios = await sql`
-            SELECT id_usuario, nome, email, st_notificacao
+            SELECT id_usuario, nome, email, st_notificacao,
+                (SELECT versao FROM usuario_foto WHERE id_usuario = usuario.id_usuario) AS foto_versao
             FROM usuario
             WHERE id_usuario = ${req.id_usuario_logado}
         `;
@@ -157,7 +184,7 @@ router.get(['/sessao', '/perfil'], verificarToken, async (req, res) => {
         const usuario = usuarios[0];
 
         return res.json({
-            usuario: { id_usuario: usuario.id_usuario, nome: usuario.nome, email: usuario.email, st_notificacao: usuario.st_notificacao },
+            usuario: dadosPublicos(usuario),
         });
     } catch {
         console.error('Erro ao verificar sessão.');

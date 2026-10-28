@@ -10,6 +10,7 @@
     },
     "scripts": {
         "test": "node --experimental-vm-modules --test tests/*.test.cjs",
+        "notificacoes:enviar": "node scripts/enviar-notificacoes.js",
         "db:audit": "node scripts/auditar-banco.js",
         "db:check": "node scripts/migrar-banco.js",
         "db:migrate": "node scripts/migrar-banco.js --apply"
@@ -25,7 +26,8 @@
         "express": "^5.3.0",
         "express-rate-limit": "^8.7.1",
         "helmet": "^8.3.0",
-        "jsonwebtoken": "^9.0.3"
+        "jsonwebtoken": "^9.0.3",
+        "sharp": "^0.35.5"
     },
     "devDependencies": {
         "@electric-sql/pglite": "^0.5.10"

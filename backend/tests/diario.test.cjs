@@ -37,7 +37,8 @@ async function criarServidor(t, protecoes = false) {
         'express-rate-limit': { rateLimit: require('express-rate-limit').rateLimit },
         jsonwebtoken: { default: jwt },
         bcrypt: { default: bcrypt },
-        'node:crypto': { createHash: require('node:crypto').createHash },
+        sharp: { default: require('sharp') },
+        'node:crypto': { createHash: require('node:crypto').createHash, randomUUID },
         '../db.js': { default: sql },
     };
 
@@ -301,13 +302,36 @@ test('cadastro, login e restauração validam os dados de acesso', async (t) => 
     const api = await criarServidor(t);
 
     await t.test('entrada inválida e senha acima de 72 bytes não chegam ao banco', async () => {
-        for (const body of [null, {}, { nome: 'Nome', email: 'invalido', senha: '12345678' },
-            { nome: 'Nome', email: 'teste@example.com', senha: 'é'.repeat(37) }]) {
+        const cadastro = { nome: 'Pessoa', email: 'teste@example.com', senha: 'senha-de-teste' };
+
+        for (const body of [undefined, null, [], {},
+            { ...cadastro, nome: '   ' }, { ...cadastro, nome: 123 },
+            { ...cadastro, nome: 'x'.repeat(101) }, { ...cadastro, nome: 'Pessoa\u0000' },
+            { ...cadastro, email: 'invalido' }, { ...cadastro, email: ['teste@example.com'] },
+            { ...cadastro, email: 'a'.repeat(139) + '@example.com' },
+            { ...cadastro, email: 'teste\u0000@example.com' },
+            { ...cadastro, senha: null }, { ...cadastro, senha: 12345678 },
+            { ...cadastro, senha: '1234567' }, { ...cadastro, senha: 'é'.repeat(37) }]) {
             assert.equal((await api.request('/usuario', 'POST', body, null)).status, 400);
         }
 
         assert.equal((await api.request('/login', 'POST', { email: 'teste@example.com', senha: 123 }, null)).status, 400);
         assert.equal(api.consultas.length, 0);
+    });
+
+    await t.test('cadastro rejeita identificadores, privilégios e preferências enviados pelo cliente', async () => {
+        const antes = api.consultas.length;
+        const cadastro = { nome: 'Pessoa', email: 'teste@example.com', senha: 'senha-de-teste' };
+
+        for (const campo of ['id_usuario', 'id', 'admin', 'role', 'permissoes', 'st_notificacao',
+            'data_cadastro', 'meta_sono_horas_min', 'meta_sono_horas_max', '__proto__']) {
+            const resposta = await api.request('/usuario', 'POST', { ...cadastro, [campo]: 'forjado' }, null);
+
+            assert.equal(resposta.status, 400);
+            assert.doesNotMatch(await resposta.text(), /senha-de-teste|teste@example.com|forjado/);
+        }
+
+        assert.equal(api.consultas.length, antes);
     });
 
     await t.test('cadastro normaliza e-mail e grava hash, sem devolvê-lo', async () => {

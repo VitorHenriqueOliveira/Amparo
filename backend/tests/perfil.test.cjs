@@ -17,7 +17,7 @@ test('perfil exige uma conta válida e consulta somente o usuário do JWT', asyn
 
     assert.equal(resposta.status, 200);
     assert.deepEqual(usuario, {
-        id_usuario: 7, nome: 'Pessoa de teste', email: 'sono@example.com', st_notificacao: true,
+        id_usuario: 7, nome: 'Pessoa de teste', email: 'sono@example.com', st_notificacao: true, foto_url: null,
     });
     assert.deepEqual(api.estado.consultas.at(-1).valores, [7]);
     assert.equal(Object.hasOwn(usuario, 'senha'), false);

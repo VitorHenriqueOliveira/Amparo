@@ -9,6 +9,8 @@ import rotasEmocoes from './routes/emocoes.js';
 import rotasSono from './routes/sono.js';
 import rotasEvolucao from './routes/evolucao.js';
 import rotasHistoricos from './routes/historicos.js';
+import rotasFoto from './routes/foto.js';
+import rotasNotificacoes from './routes/notificacoes.js';
 
 // Separa a configuração da API da abertura da porta para permitir testes.
 export function criarApp({ origensPermitidas, proxiesConfiaveis = 0 }) {
@@ -60,6 +62,8 @@ export function criarApp({ origensPermitidas, proxiesConfiaveis = 0 }) {
 
     app.use(express.json({ limit: '64kb' }));
     app.use('/api', rotasUsuario);
+    app.use('/api', rotasFoto);
+    app.use('/api', rotasNotificacoes);
     app.use('/api', rotasCalma);
     app.use('/api', rotasEmocoes);
     app.use('/api', rotasEvolucao);
@@ -83,6 +87,10 @@ export function criarApp({ origensPermitidas, proxiesConfiaveis = 0 }) {
 
         if (error.type === 'entity.parse.failed') {
             return res.status(400).json({ erro: 'Envie um JSON válido.' });
+        }
+
+        if (error.type === 'encoding.unsupported') {
+            return res.status(415).json({ erro: 'Envie o arquivo sem compressão de transporte.' });
         }
 
         if (error.status === 403) {

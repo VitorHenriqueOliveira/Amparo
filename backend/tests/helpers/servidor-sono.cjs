@@ -8,7 +8,7 @@ async function criarAmbienteSono(porta = 0) {
     const banco = new PGlite();
     for (const nome of ['001_estrutura_inicial.sql', '002_calma_historico.sql',
         '003_registro_emocional.sql', '004_integridade_dos_registros.sql', '006_registro_sono.sql',
-        '007_preferencias_perfil.sql', '008_importacao_historicos.sql']) {
+        '007_preferencias_perfil.sql', '008_importacao_historicos.sql', '009_notificacoes.sql', '010_foto_perfil.sql']) {
         await banco.exec(fs.readFileSync(path.join(__dirname, '../../migrations', nome), 'utf8'));
     }
     const hash = await require('bcrypt').hash('teste1234', 10);
@@ -29,7 +29,8 @@ async function criarAmbienteSono(porta = 0) {
         'express-rate-limit': { rateLimit: require('express-rate-limit').rateLimit },
         jsonwebtoken: { default: jwt },
         bcrypt: { default: require('bcrypt') },
-        'node:crypto': { createHash: require('node:crypto').createHash },
+        sharp: { default: require('sharp') },
+        'node:crypto': { createHash: require('node:crypto').createHash, randomUUID: require('node:crypto').randomUUID },
         '../db.js': { default: sql },
     };
     const modulos = new Map();
@@ -56,7 +57,7 @@ async function criarAmbienteSono(porta = 0) {
         algorithm: 'HS256', issuer: 'amparo-api', audience: 'amparo-app', expiresIn: '1h',
     });
     return {
-        banco, estado, base,
+        banco, estado, base, sql, token,
         request(rota, method = 'GET', body, id = 7) {
             return fetch(base + rota, {
                 method, headers: { 'Content-Type': 'application/json', ...(id ? { Authorization: 'Bearer ' + token(id) } : {}) },

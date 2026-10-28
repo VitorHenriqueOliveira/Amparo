@@ -7,6 +7,10 @@ const tabelas = [
     ['sono', 'id_sono', "to_jsonb(t) - 'fuso_horario'"],
     ['calma_historico', 'id_calma', 'to_jsonb(t)'],
     ['importacao_historico', 'chave', 'to_jsonb(t)'],
+    ['notificacao_dispositivo', 'id_instalacao', 'to_jsonb(t)'],
+    ['notificacao_lembrete', 'id_lembrete', 'to_jsonb(t)'],
+    ['notificacao_envio', 'id_envio', 'to_jsonb(t)'],
+    ['usuario_foto', 'id_usuario', 'to_jsonb(t)'],
 ];
 
 function literal(valor) {
