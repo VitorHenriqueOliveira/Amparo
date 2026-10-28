@@ -35,7 +35,8 @@ async function criarAmbienteEmocoes() {
         'express-rate-limit': { rateLimit: require('express-rate-limit').rateLimit },
         jsonwebtoken: { default: jwt },
         bcrypt: { default: require('bcrypt') },
-        'node:crypto': { createHash: require('node:crypto').createHash },
+        sharp: { default: require('sharp') },
+        'node:crypto': { createHash: require('node:crypto').createHash, randomUUID: require('node:crypto').randomUUID },
         '../db.js': { default: sql },
     };
     const modulos = new Map();

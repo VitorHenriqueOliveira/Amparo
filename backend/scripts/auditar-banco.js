@@ -24,6 +24,19 @@ try {
         sql`SELECT 'calma_historico' AS tabela, count(*)::int AS registros,
             count(*) FILTER (WHERE duracao_segundos <= 0)::int AS duracoes_invalidas,
             count(*) FILTER (WHERE NOT isfinite(concluido_em) OR NOT isfinite(recebido_em))::int AS datas_invalidas FROM calma_historico`,
+        sql`SELECT 'notificacao_dispositivo' AS tabela, count(*)::int AS registros,
+            count(*) FILTER (WHERE st_ativo AND NOT permissao)::int AS permissoes_invalidas
+            FROM notificacao_dispositivo`,
+        sql`SELECT 'notificacao_lembrete' AS tabela, count(*)::int AS registros,
+            count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM pg_timezone_names f WHERE f.name = l.fuso_horario))::int AS fusos_invalidos
+            FROM notificacao_lembrete l`,
+        sql`SELECT 'notificacao_envio' AS tabela, count(*)::int AS registros,
+            count(*) FILTER (WHERE estado IN ('aceito', 'entregue') AND ticket IS NULL)::int AS confirmacoes_invalidas
+            FROM notificacao_envio`,
+        sql`SELECT 'usuario_foto' AS tabela, count(*)::int AS registros,
+            count(*) FILTER (WHERE octet_length(conteudo) NOT BETWEEN 1 AND 524288
+                OR largura NOT BETWEEN 1 AND 512 OR altura NOT BETWEEN 1 AND 512)::int AS fotos_invalidas
+            FROM usuario_foto`,
     ], { readOnly: true });
 
     console.log(JSON.stringify(resultados.map((resultado) => resultado[0]), null, 4));
