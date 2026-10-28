@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { FlatList, Modal, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { listarDiarioPeriodo } from '../services/diario';
+import { mensagemFalhaConexao } from '../services/api';
 import { criarEstilos } from '../theme/estilos';
 import { CORES, MEDIDAS } from '../theme/tema';
 
@@ -10,13 +11,13 @@ export default function RegistrosDiario({ periodo, onFechar, onAbrirDiario }) {
     const [tentativa, setTentativa] = useState(0);
     const [dados, setDados] = useState(null);
     const [carregando, setCarregando] = useState(true);
-    const [erro, setErro] = useState(false);
+    const [erro, setErro] = useState('');
 
     useEffect(() => {
         let ativo = true;
 
         setCarregando(true);
-        setErro(false);
+        setErro('');
         setDados(null);
         listarDiarioPeriodo(periodo.inicio, periodo.fim, pagina)
             .then((resposta) => {
@@ -27,7 +28,9 @@ export default function RegistrosDiario({ periodo, onFechar, onAbrirDiario }) {
                 if (pagina > ultimaPagina) setPagina(ultimaPagina);
                 else setDados(resposta);
             })
-            .catch(() => { if (ativo) setErro(true); })
+            .catch((falha) => {
+                if (ativo) setErro(mensagemFalhaConexao(falha, 'Não foi possível carregar seu diário. Tente novamente.'));
+            })
             .finally(() => { if (ativo) setCarregando(false); });
 
         return () => { ativo = false; };
@@ -55,7 +58,7 @@ export default function RegistrosDiario({ periodo, onFechar, onAbrirDiario }) {
                     ) : erro ? (
                         <View>
                             <Text style={styles.mensagem} accessibilityRole="alert">
-                                Não foi possível carregar seu diário. Verifique a conexão e tente novamente.
+                                {erro}
                             </Text>
                             <TouchableOpacity onPress={() => setTentativa((valor) => valor + 1)} style={styles.botao}
                                 accessibilityRole="button" accessibilityLabel="Tentar carregar diário novamente">

@@ -32,6 +32,7 @@ async function preparar(consultar) {
         'react-native': Object.fromEntries(['FlatList', 'Modal', 'Text', 'TouchableOpacity', 'View'].map((nome) => [nome, nome])),
         '@expo/vector-icons': { Ionicons: 'Ionicons' },
         '../services/diario': { listarDiarioPeriodo: consultar },
+        '../services/api': { mensagemFalhaConexao: (_, alternativa) => alternativa },
         '../theme/estilos': { criarEstilos: (valor) => valor },
         '../theme/tema': { CORES: {}, MEDIDAS: {} },
     };

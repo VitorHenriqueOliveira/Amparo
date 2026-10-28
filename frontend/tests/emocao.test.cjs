@@ -46,6 +46,7 @@ async function prepararTela(salvar) {
             adicionarEmocao: salvar,
             criarIdConfirmacao: () => 'confirmacao-' + ++idsGerados,
         },
+        '../services/api': { mensagemFalhaConexao: (_, alternativa) => alternativa },
     };
     const fonte = fs.readFileSync(path.join(__dirname, '../src/screens/Emocao.js'), 'utf8');
     const codigo = babel.transformSync(fonte, {

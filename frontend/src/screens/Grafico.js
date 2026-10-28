@@ -11,6 +11,7 @@ import { buscarEvolucao } from '../services/evolucao';
 import { formatarDuracao } from '../utils/sono';
 import { chaveData, obterPeriodo, moverPeriodo, nomeDia } from '../utils/evolucao';
 import { AuthContext } from '../contexts/AuthContext';
+import { mensagemFalhaConexao } from '../services/api';
 import RegistrosDiario from '../components/RegistrosDiario';
 const EMOCOES = {
     feliz: {
@@ -163,7 +164,7 @@ export default function GraficoScreen({ navigation }) {
     const [tentativa, setTentativa] = useState(0);
     const [dados, setDados] = useState(null);
     const [carregando, setCarregando] = useState(true);
-    const [erro, setErro] = useState(false);
+    const [erro, setErro] = useState('');
     const [consultaDiario, setConsultaDiario] = useState(null);
     const periodo = obterPeriodo(filtro, referencia);
     const { inicio, fim } = periodo;
@@ -171,14 +172,14 @@ export default function GraficoScreen({ navigation }) {
     useFocusEffect(useCallback(() => {
         let ativo = true;
         setCarregando(true);
-        setErro(false);
+        setErro('');
         setDados(null);
         buscarEvolucao(inicio, fim)
             .then((relatorio) => {
                 if (ativo) setDados({ idUsuario, relatorio });
             })
-            .catch(() => {
-                if (ativo) setErro(true);
+            .catch((falha) => {
+                if (ativo) setErro(mensagemFalhaConexao(falha, 'Não foi possível carregar os dados deste período. Tente novamente.'));
             })
             .finally(() => {
                 if (ativo) setCarregando(false);
@@ -216,8 +217,8 @@ export default function GraficoScreen({ navigation }) {
 
                     {erro && (
                         <View style={styles.errorCard}>
-                            <Text style={styles.errorText}>
-                                Não foi possível carregar os dados deste período.
+                            <Text style={styles.errorText} accessibilityRole="alert">
+                                {erro}
                             </Text>
                             <TouchableOpacity onPress={() => setTentativa((valor) => valor + 1)} accessibilityRole="button">
                                 <Text style={styles.retryText}>Tentar novamente</Text>

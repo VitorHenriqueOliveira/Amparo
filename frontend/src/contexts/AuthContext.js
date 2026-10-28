@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useRef, useCallback } from 'react';
 import { AppState } from 'react-native';
-import { observarFalhaAutenticacao } from '../services/api';
+import { mensagemFalhaConexao, observarFalhaAutenticacao } from '../services/api';
 import { sincronizarCiclosCalma } from '../services/calma';
 import { sincronizarHistoricosAntigos } from '../services/historicos';
 import { buscarPerfil, atualizarPerfil, atualizarNotificacoes } from '../services/usuario';
@@ -19,9 +19,43 @@ export function AuthProvider({ children }) {
     const [usuario, setUsuario] = useState(null);
     const [carregando, setCarregando] = useState(true);
     const [sessaoRestaurada, setSessaoRestaurada] = useState(false);
+    const [erroRestauracao, setErroRestauracao] = useState('');
+    const restauracaoEmCurso = useRef(false);
+    const montado = useRef(true);
     const versaoSessao = useRef(0);
     const [revisaoHistoricos, setRevisaoHistoricos] = useState(0);
     const idUsuario = usuario?.id_usuario;
+
+    const tentarRestaurarSessao = useCallback(async () => {
+        if (restauracaoEmCurso.current) return;
+        restauracaoEmCurso.current = true;
+        const versao = versaoSessao.current;
+        setCarregando(true);
+        setErroRestauracao('');
+
+        try {
+            const salvo = await restaurarSessao();
+
+            if (montado.current && versao === versaoSessao.current && salvo) {
+                setSessaoRestaurada(true);
+                setUsuario(salvo);
+            }
+        } catch (erro) {
+            if (montado.current && versao === versaoSessao.current) {
+                setErroRestauracao(mensagemFalhaConexao(erro, 'Não foi possível entrar agora. Tente novamente.'));
+            }
+        } finally {
+            restauracaoEmCurso.current = false;
+
+            if (montado.current && versao === versaoSessao.current) {
+                setCarregando(false);
+            }
+        }
+    }, []);
+
+    const continuarNoLogin = useCallback(() => {
+        if (!restauracaoEmCurso.current) setErroRestauracao('');
+    }, []);
 
     useEffect(() => {
         if (!idUsuario) return;
@@ -68,13 +102,15 @@ export function AuthProvider({ children }) {
     }, [usuario?.id_usuario]);
 
     useEffect(() => {
-        let ativo = true;
+        montado.current = true;
 
         function invalidarSessao() {
             versaoSessao.current++;
             // Fecha as telas privadas imediatamente, mesmo se a limpeza local falhar.
             setUsuario(null);
             setSessaoRestaurada(false);
+            setErroRestauracao('');
+            setCarregando(false);
 
             encerrarSessao().catch(() => {
                 console.error('Não foi possível limpar os dados locais da sessão.');
@@ -89,37 +125,22 @@ export function AuthProvider({ children }) {
             }
         });
 
-        async function carregar() {
-            try {
-                const salvo = await restaurarSessao();
-
-                if (ativo && salvo) {
-                    setSessaoRestaurada(true);
-                    setUsuario(salvo);
-                }
-            } catch {
-                console.error('Não foi possível restaurar a sessão.');
-            } finally {
-                if (ativo) {
-                    setCarregando(false);
-                }
-            }
-        }
-
-        carregar();
+        tentarRestaurarSessao();
 
         return () => {
-            ativo = false;
+            montado.current = false;
             pararFalhas();
             pararExpiracao();
             estadoApp.remove();
         };
-    }, []);
+    }, [tentarRestaurarSessao]);
 
     async function login(dadosUsuario, token) {
         await iniciarSessao(dadosUsuario, token);
         versaoSessao.current++;
         setSessaoRestaurada(false);
+        setErroRestauracao('');
+        setCarregando(false);
         setUsuario(dadosUsuario);
     }
 
@@ -130,6 +151,8 @@ export function AuthProvider({ children }) {
         } finally {
             setUsuario(null);
             setSessaoRestaurada(false);
+            setErroRestauracao('');
+            setCarregando(false);
         }
     }
 
@@ -158,7 +181,7 @@ export function AuthProvider({ children }) {
 
     return (
         <AuthContext.Provider value={{ usuario, login, logout, atualizarNome, recarregarPerfil, salvarNotificacoes,
-            carregando, sessaoRestaurada, revisaoHistoricos }}>
+            carregando, sessaoRestaurada, revisaoHistoricos, erroRestauracao, tentarRestaurarSessao, continuarNoLogin }}>
             {children}
         </AuthContext.Provider>
     );

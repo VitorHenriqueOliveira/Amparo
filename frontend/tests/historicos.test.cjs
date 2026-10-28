@@ -21,6 +21,7 @@ async function preparar(iniciais = {}) {
         defaults: { headers: { common: { Authorization: 'Bearer 7' } } },
         async post(rota, body, config) {
             assert.equal(rota, '/historicos/importar');
+            assert.equal(config.silenciosa, true);
             pedidos.push({ body: copia(body), autorizacao: config.headers.Authorization });
             if (interceptar) return interceptar(body, config);
             const chave = config.headers.Authorization + body.tipo + body.chave;

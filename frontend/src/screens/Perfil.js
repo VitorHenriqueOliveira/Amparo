@@ -19,6 +19,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../contexts/AuthContext';
+import { mensagemFalhaConexao } from '../services/api';
 export default function Perfil({ navigation }) {
     const { usuario, logout, atualizarNome, recarregarPerfil, salvarNotificacoes } = useContext(AuthContext);
     const nome = usuario?.nome || 'Seu Nome';
@@ -44,8 +45,8 @@ export default function Perfil({ navigation }) {
         try {
             await recarregarPerfil();
             setPerfilCarregado(true);
-        } catch {
-            setErroPerfil('Não foi possível carregar seu perfil. Verifique a conexão e tente novamente.');
+        } catch (erro) {
+            setErroPerfil(mensagemFalhaConexao(erro, 'Não foi possível carregar seu perfil. Tente novamente.'));
         } finally {
             operacaoEmCurso.current = false;
             setCarregando(false);
@@ -81,8 +82,8 @@ export default function Perfil({ navigation }) {
         try {
             await atualizarNome(nomeFinal);
             setModalVisivel(false);
-        } catch {
-            setErroEdicao('Não foi possível salvar o nome. Verifique a conexão e tente novamente.');
+        } catch (erro) {
+            setErroEdicao(mensagemFalhaConexao(erro, 'Não foi possível salvar o nome. Tente novamente.'));
         } finally {
             operacaoEmCurso.current = false;
             setSalvando(null);
@@ -99,8 +100,8 @@ export default function Perfil({ navigation }) {
 
         try {
             await salvarNotificacoes(valor);
-        } catch {
-            setErroPerfil('Não foi possível confirmar a alteração das notificações. Verifique a conexão e tente novamente.');
+        } catch (erro) {
+            setErroPerfil(mensagemFalhaConexao(erro, 'Não foi possível confirmar a alteração das notificações. Tente novamente.'));
         } finally {
             operacaoEmCurso.current = false;
             setNotificacoesPendentes(null);

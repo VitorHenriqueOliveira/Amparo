@@ -44,6 +44,7 @@ async function carregar(arquivo, dependencias) {
         'expo-linear-gradient': { LinearGradient: 'LinearGradient' },
         '@expo/vector-icons': { Ionicons: 'Ionicons' },
         '../contexts/AuthContext': { AuthContext: {} },
+        '../services/api': { mensagemFalhaConexao: (_, alternativa) => alternativa },
         '../theme/estilos': { criarEstilos: (valor) => valor },
         '../theme/tema': { CORES: {}, DEGRADES: {} },
         '../components/NavegacaoPadrao': { AreaDaTela: 'AreaDaTela', Cabecalho: 'Cabecalho', NavegacaoInferior: 'NavegacaoInferior' },
@@ -177,7 +178,7 @@ test('resposta de perfil recebida após logout não reabre a conta nem salva dad
     let concluir;
     let gravacoes = 0;
     const tela = await carregar('src/contexts/AuthContext.js', { imports: {
-        '../services/api': { observarFalhaAutenticacao() {} },
+        '../services/api': { observarFalhaAutenticacao() {}, mensagemFalhaConexao: (_, alternativa) => alternativa },
         '../services/calma': { sincronizarCiclosCalma() {} },
         '../services/historicos': { sincronizarHistoricosAntigos() {} },
         '../services/usuario': {

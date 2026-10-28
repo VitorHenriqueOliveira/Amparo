@@ -16,6 +16,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../contexts/AuthContext';
+import { mensagemFalhaConexao } from '../services/api';
 import SeletorHorario from '../components/SeletorHorario';
 import { atualizarMetaSono, buscarSono, registrarSonoHoje } from '../services/sono';
 import { avaliarMeta, calcularDuracao, formatarDuracao } from '../utils/sono';
@@ -108,9 +109,9 @@ export default function SonoScreen({ navigation }) {
                 setDados(resposta);
                 setErro('');
             }
-        } catch {
+        } catch (falha) {
             if (vivo.current && consulta === versao.current) {
-                setErro('Não foi possível carregar seu sono. Verifique a conexão e tente novamente.');
+                setErro(mensagemFalhaConexao(falha, 'Não foi possível carregar seu sono. Tente novamente.'));
             }
         } finally {
             if (vivo.current && consulta === versao.current) setCarregando(false);
@@ -210,7 +211,7 @@ export default function SonoScreen({ navigation }) {
                     }
                 }
             } else {
-                setErroForm('Não foi possível salvar. Seus ajustes continuam aqui para tentar novamente.');
+                setErroForm(mensagemFalhaConexao(falha, 'Não foi possível salvar. Seus ajustes continuam aqui para tentar novamente.'));
             }
         } finally {
             gravando.current = false;

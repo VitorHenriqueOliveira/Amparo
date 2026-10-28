@@ -161,7 +161,7 @@ export function sincronizarHistoricosAntigos(idUsuario) {
             try {
                 const { data } = await api.post('/historicos/importar', {
                     tipo: item.tipo, chave: item.chave, dados: item.dados,
-                }, { headers: { Authorization: autorizacao } });
+                }, { headers: { Authorization: autorizacao }, silenciosa: true });
                 if (data?.tipo !== item.tipo || data.chave !== item.chave
                     || !['importado', 'existente', 'conflito'].includes(data.situacao)
                     || !Number.isSafeInteger(data.registro) || data.registro <= 0) {

@@ -7,6 +7,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider, AuthContext } from './src/contexts/AuthContext';
+import AvisoConexao from './src/components/AvisoConexao';
 
 // Importação das telas a partir de ./src/screens/
 import HomeScreen from "./src/screens/Home";
@@ -50,10 +51,30 @@ function MainTabs() {
 
 // A verificação da sessão não precisa bloquear o acesso ao exercício offline.
 function RestaurandoScreen({ navigation }) {
+    const { carregando, erroRestauracao, tentarRestaurarSessao, continuarNoLogin } = React.useContext(AuthContext);
+
     return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F0FCCE' }}>
-            <ActivityIndicator size="large" color="#4E750F" />
-            <Text style={{ marginTop: 16, color: '#274804' }}>Carregando…</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#F0FCCE' }}>
+            {carregando ? (
+                <>
+                    <ActivityIndicator size="large" color="#4E750F" />
+                    <Text style={{ marginTop: 16, color: '#274804' }}>Entrando na sua conta…</Text>
+                </>
+            ) : (
+                <>
+                    <Text style={{ color: '#274804', textAlign: 'center', lineHeight: 24 }} accessibilityRole="alert">
+                        {erroRestauracao}
+                    </Text>
+                    <TouchableOpacity onPress={tentarRestaurarSessao}
+                        style={{ marginTop: 16, padding: 16, borderRadius: 24, backgroundColor: '#BBFF00' }}
+                        accessibilityRole="button" accessibilityLabel="Tentar entrar novamente">
+                        <Text style={{ color: '#274804', fontWeight: '700' }}>Tentar novamente</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={continuarNoLogin} style={{ padding: 16 }} accessibilityRole="button">
+                        <Text style={{ color: '#274804' }}>Ir para o login</Text>
+                    </TouchableOpacity>
+                </>
+            )}
 
             <TouchableOpacity
                 onPress={() => navigation.navigate('CalmaUrgente')}
@@ -69,13 +90,14 @@ function RestaurandoScreen({ navigation }) {
 
 // Gerencia o acesso aos dados pessoais depois da validação da sessão.
 function AppRoutes() {
-    const { usuario, carregando, sessaoRestaurada } = React.useContext(AuthContext);
+    const { usuario, carregando, sessaoRestaurada, erroRestauracao } = React.useContext(AuthContext);
+    const restaurando = carregando || !!erroRestauracao;
 
     return (
         <NavigationContainer>
-            <Stack.Navigator key={usuario ? 'autenticado' : 'visitante'} initialRouteName={usuario ? (sessaoRestaurada ? 'MainTabs' : 'Intro') : (carregando ? 'Restaurando' : 'Login')} screenOptions={{ headerShown: false, animation: "fade" }}>
+            <Stack.Navigator key={usuario ? 'autenticado' : 'visitante'} initialRouteName={usuario ? (sessaoRestaurada ? 'MainTabs' : 'Intro') : (restaurando ? 'Restaurando' : 'Login')} screenOptions={{ headerShown: false, animation: "fade" }}>
 
-                {carregando && <Stack.Screen name="Restaurando" component={RestaurandoScreen} />}
+                {restaurando && <Stack.Screen name="Restaurando" component={RestaurandoScreen} />}
 
                 {usuario ? (
                     // Se ESTIVER logado, ele só tem acesso a essas telas:
@@ -101,7 +123,10 @@ export default function App() {
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaProvider>
                 <AuthProvider>
-                    <AppRoutes />
+                    <View style={{ flex: 1 }}>
+                        <AvisoConexao />
+                        <AppRoutes />
+                    </View>
                 </AuthProvider>
             </SafeAreaProvider>
         </GestureHandlerRootView>

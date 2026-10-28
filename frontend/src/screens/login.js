@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import api from '../services/api';
+import api, { mensagemFalhaConexao } from '../services/api';
 import { AuthContext } from '../contexts/AuthContext';
 export default function LoginScreen({ navigation }) {
     const { height } = useWindowDimensions();
@@ -26,17 +26,19 @@ export default function LoginScreen({ navigation }) {
     const [email, setEmail] = useState('');
     const [senha, setSenha] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const envioEmCurso = useRef(false);
     const { login } = useContext(AuthContext);
     function mostrarErro(mensagem) {
         if (Platform.OS === 'web') window.alert(mensagem);
         else Alert.alert('Acesso', mensagem);
     }
     async function handleLogin() {
-        if (isLoading) return;
+        if (envioEmCurso.current) return;
         if (!email.trim() || !senha.trim()) {
             mostrarErro('Por favor, preencha seu e-mail e senha.');
             return;
         }
+        envioEmCurso.current = true;
         setIsLoading(true);
         try {
             const { data } = await api.post('/login', {
@@ -48,9 +50,12 @@ export default function LoginScreen({ navigation }) {
             mostrarErro(
                 error.response?.status === 401
                     ? 'E-mail ou senha incorretos. Tente novamente.'
-                    : 'Não foi possível entrar. Verifique sua conexão e tente novamente.'
+                    : error.response?.status === 429
+                        ? 'Muitas tentativas de acesso. Aguarde 15 minutos e tente novamente.'
+                        : mensagemFalhaConexao(error, 'Não foi possível entrar. Tente novamente em instantes.')
             );
         } finally {
+            envioEmCurso.current = false;
             setIsLoading(false);
         }
     }
@@ -190,6 +195,9 @@ export default function LoginScreen({ navigation }) {
                                     ]}
                                     onPress={handleLogin}
                                     disabled={isLoading}
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Entrar"
+                                    accessibilityState={{ disabled: isLoading, busy: isLoading }}
                                     activeOpacity={0.8}
                                 >
                                     {isLoading ? (

@@ -9,11 +9,67 @@ if (!__DEV__ && !enderecoApi.startsWith('https://')) {
 
 const api = axios.create({
     baseURL: enderecoApi,
-    // A API gratuita pode precisar de mais tempo na primeira conexão após ficar ociosa.
-    timeout: Number(process.env.EXPO_PUBLIC_API_TIMEOUT_MS || 15000),
+    // O mesmo limite vale para desenvolvimento, teste e produção.
+    timeout: 15000,
 });
 
 const ouvintes = new Set();
+const ouvintesEspera = new Set();
+const requisicoes = new Map();
+let esperando = false;
+
+function atualizarEspera() {
+    const atual = [...requisicoes.values()].some((requisicao) => requisicao.demorando);
+
+    if (atual === esperando) return;
+    esperando = atual;
+
+    for (const callback of ouvintesEspera) {
+        callback(atual);
+    }
+}
+
+export function observarEsperaConexao(callback) {
+    ouvintesEspera.add(callback);
+    callback(esperando);
+
+    return () => ouvintesEspera.delete(callback);
+}
+
+export function mensagemFalhaConexao(erro, alternativa) {
+    if (['ECONNABORTED', 'ETIMEDOUT'].includes(erro?.code) ||
+        [502, 503, 504].includes(erro?.response?.status)) {
+        return 'A conexão está demorando. No primeiro acesso, pode ser preciso aguardar cerca de um minuto e tentar novamente.';
+    }
+
+    if (!erro?.response && (erro?.request || erro?.code === 'ERR_NETWORK')) {
+        return 'Não foi possível conectar. Verifique sua conexão e tente novamente.';
+    }
+
+    return alternativa;
+}
+
+function concluirEspera(config) {
+    const requisicao = requisicoes.get(config);
+
+    if (!requisicao) return;
+    clearTimeout(requisicao.temporizador);
+    requisicoes.delete(config);
+    atualizarEspera();
+}
+
+api.interceptors.request.use((config) => {
+    if (config.silenciosa) return config;
+    const requisicao = { demorando: false };
+
+    requisicao.temporizador = setTimeout(() => {
+        requisicao.demorando = true;
+        atualizarEspera();
+    }, 5000);
+    requisicoes.set(config, requisicao);
+
+    return config;
+});
 
 export function observarFalhaAutenticacao(callback) {
     ouvintes.add(callback);
@@ -22,8 +78,13 @@ export function observarFalhaAutenticacao(callback) {
 }
 
 api.interceptors.response.use(
-    (resposta) => resposta,
+    (resposta) => {
+        concluirEspera(resposta.config);
+
+        return resposta;
+    },
     (erro) => {
+        concluirEspera(erro.config);
         const cabecalhos = erro.config?.headers;
         const autorizacao = cabecalhos?.get?.('Authorization') || cabecalhos?.Authorization;
         const rotaPublica = ['/login', '/usuario'].includes(erro.config?.url);

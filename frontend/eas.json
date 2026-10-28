@@ -24,8 +24,7 @@
             "distribution": "internal",
             "autoIncrement": true,
             "env": {
-                "APP_VARIANT": "preview",
-                "EXPO_PUBLIC_API_TIMEOUT_MS": "90000"
+                "APP_VARIANT": "preview"
             },
             "android": {
                 "buildType": "apk"

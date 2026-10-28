@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { adicionarEmocao, criarIdConfirmacao } from '../services/emocoes';
+import { mensagemFalhaConexao } from '../services/api';
 const CONFIRMATION_DURATION = 1100;
 const EMOTIONS = {
     feliz: {
@@ -102,8 +103,8 @@ export default function EmocaoScreen({ navigation }) {
             pendingConfirmation.current = null;
             setSelectedEmotionKey(null);
             setConfirmation((current) => current + 1);
-        } catch {
-            setErrorMessage('Não foi possível salvar a emoção. Verifique sua conexão e tente novamente.');
+        } catch (erro) {
+            setErrorMessage(mensagemFalhaConexao(erro, 'Não foi possível salvar a emoção. Tente novamente.'));
         } finally {
             savingRef.current = false;
             setSaving(false);

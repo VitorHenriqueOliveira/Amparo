@@ -285,6 +285,7 @@ test('401 autenticado invalida a sessão atual e ignora login e respostas de ses
     const api = {
         defaults: { headers: { common: { Authorization: 'Bearer atual' } } },
         interceptors: {
+            request: { use() {} },
             response: {
                 use(sucesso, erro) {
                     tratarErro = erro;

@@ -142,7 +142,7 @@ export function sincronizarCiclosCalma(idUsuario) {
             const { data } = await api.post('/calma', {
                 id_cliente: registro.id_cliente,
                 concluido_em: registro.concluido_em,
-            }, { headers: { Authorization: autorizacao } });
+            }, { headers: { Authorization: autorizacao }, silenciosa: true });
 
             // Só remove da fila depois da confirmação, inclusive em reenvios.
             if (!registroValido(data, true) || data.id_cliente !== registro.id_cliente ||

@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { listarDiario, criarNota, atualizarNota, excluirNota } from '../services/diario';
 import { AuthContext } from '../contexts/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
+import { mensagemFalhaConexao } from '../services/api';
 function mostrarMensagem(titulo, mensagem) {
     if (Platform.OS === 'web') window.alert(titulo + '\n\n' + mensagem);
     else Alert.alert(titulo, mensagem);
@@ -30,13 +31,15 @@ export default function DiarioScreen({ navigation }) {
     const [isWriting, setIsWriting] = useState(false);
     const [notesLoaded, setNotesLoaded] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [loadError, setLoadError] = useState(false);
+    const [loadError, setLoadError] = useState('');
+    const [tentativa, setTentativa] = useState(0);
     useFocusEffect(
         useCallback(() => {
             let mounted = true;
             async function carregarNotas() {
                 setNotesLoaded(false);
-                setLoadError(false);
+                setLoadError('');
+                setNotes([]);
                 try {
                     const notasSalvas = await listarDiario(idUsuario);
                     if (mounted) {
@@ -45,7 +48,7 @@ export default function DiarioScreen({ navigation }) {
                 } catch (error) {
                     console.error('Erro ao carregar diário.');
                     if (mounted) {
-                        setLoadError(true);
+                        setLoadError(mensagemFalhaConexao(error, 'Não foi possível carregar seus registros. Tente novamente.'));
                     }
                 } finally {
                     if (mounted) {
@@ -57,7 +60,7 @@ export default function DiarioScreen({ navigation }) {
             return () => {
                 mounted = false;
             };
-        }, [idUsuario, revisaoHistoricos])
+        }, [idUsuario, revisaoHistoricos, tentativa])
     );
     const handleSave = async () => {
         if (!notesLoaded || saving) return;
@@ -79,7 +82,7 @@ export default function DiarioScreen({ navigation }) {
             setIsWriting(false);
         } catch (error) {
             console.error('Erro ao salvar registro.');
-            mostrarMensagem('Erro ao salvar', 'Não foi possível salvar seu registro. Tente novamente.');
+            mostrarMensagem('Erro ao salvar', mensagemFalhaConexao(error, 'Não foi possível salvar seu registro. Tente novamente.'));
         } finally {
             setSaving(false);
         }
@@ -103,7 +106,7 @@ export default function DiarioScreen({ navigation }) {
                 }
             } catch (error) {
                 console.error('Erro ao excluir registro.');
-                mostrarMensagem('Erro', 'Não foi possível excluir o registro.');
+                mostrarMensagem('Erro', mensagemFalhaConexao(error, 'Não foi possível excluir o registro. Tente novamente.'));
             } finally {
                 setSaving(false);
             }
@@ -207,11 +210,18 @@ export default function DiarioScreen({ navigation }) {
                                             size={54}
                                             color="rgba(255,255,255,0.3)"
                                         />
-                                        <Text style={styles.emptyText}>
+                                        <Text style={styles.emptyText} accessibilityRole={loadError ? 'alert' : undefined}>
                                             {loadError
-                                                ? 'Não foi possível carregar seus registros. Volte a esta tela para tentar novamente.'
+                                                ? loadError
                                                 : 'Nenhum registro encontrado.\nToque no botão abaixo para adicionar.'}
                                         </Text>
+                                        {!!loadError && (
+                                            <TouchableOpacity onPress={() => setTentativa((valor) => valor + 1)}
+                                                style={[styles.saveButton, { marginTop: 16 }]}
+                                                accessibilityRole="button" accessibilityLabel="Tentar carregar registros novamente">
+                                                <Text style={styles.saveButtonText}>Tentar novamente</Text>
+                                            </TouchableOpacity>
+                                        )}
                                     </View>
                                 ) : (
                                     <FlatList

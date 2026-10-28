@@ -7,7 +7,7 @@ const babel = require('@babel/core');
 
 const estabilizar = () => new Promise((resolve) => setImmediate(resolve));
 
-async function preparar({ restaurado = null, sincronizar } = {}) {
+async function preparar({ restaurado = null, sincronizar, restaurar } = {}) {
     const hooks = [];
     const efeitos = [];
     const intervalos = new Set();
@@ -49,7 +49,7 @@ async function preparar({ restaurado = null, sincronizar } = {}) {
         react: { default: react, ...react },
         'react/jsx-runtime': { jsx, jsxs: jsx },
         'react-native': { AppState: appState },
-        '../services/api': { observarFalhaAutenticacao: () => () => {} },
+        '../services/api': { observarFalhaAutenticacao: () => () => {}, mensagemFalhaConexao: (_, alternativa) => alternativa },
         '../services/calma': { sincronizarCiclosCalma: async () => {} },
         '../services/historicos': { sincronizarHistoricosAntigos: (id) => {
             importacoes.push(id);
@@ -57,7 +57,7 @@ async function preparar({ restaurado = null, sincronizar } = {}) {
         } },
         '../services/usuario': { buscarPerfil() {}, atualizarPerfil() {}, atualizarNotificacoes() {} },
         '../services/sessao': {
-            restaurarSessao: async () => restaurado,
+            restaurarSessao: restaurar || (async () => restaurado),
             iniciarSessao: async () => {}, encerrarSessao: async () => {}, salvarUsuario: async () => {},
             observarExpiracao: () => () => {}, verificarExpiracao() {},
         },
@@ -98,6 +98,55 @@ async function preparar({ restaurado = null, sincronizar } = {}) {
     renderizar();
     return app;
 }
+
+test('falha de restauração oferece nova tentativa, bloqueia toques duplicados e só abre a conta após confirmar', async () => {
+    let tentativas = 0;
+    let concluir;
+    const app = await preparar({ restaurar: () => {
+        if (++tentativas === 1) return Promise.reject({ code: 'ECONNABORTED' });
+        return new Promise((resolve) => { concluir = resolve; });
+    } });
+
+    assert.equal(app.renderizar().usuario, null);
+    assert.equal(app.renderizar().carregando, false);
+    assert.ok(app.renderizar().erroRestauracao);
+    const repetir = app.renderizar().tentarRestaurarSessao;
+    const tentativa = repetir();
+    await repetir();
+    assert.equal(tentativas, 2);
+    assert.equal(app.renderizar().carregando, true);
+    assert.equal(app.renderizar().erroRestauracao, '');
+    concluir({ id_usuario: 7 });
+    await tentativa;
+    assert.equal(app.renderizar().usuario.id_usuario, 7);
+    assert.equal(app.renderizar().sessaoRestaurada, true);
+    assert.equal(app.renderizar().carregando, false);
+});
+
+test('após falha de restauração é possível ir ao login sem repetir chamadas', async () => {
+    let tentativas = 0;
+    const app = await preparar({ restaurar: async () => {
+        tentativas++;
+        throw new Error('Sem conexão');
+    } });
+
+    assert.ok(app.renderizar().erroRestauracao);
+    app.renderizar().continuarNoLogin();
+    assert.equal(app.renderizar().erroRestauracao, '');
+    assert.equal(app.renderizar().carregando, false);
+    assert.equal(app.renderizar().usuario, null);
+    assert.equal(tentativas, 1);
+});
+
+test('resposta atrasada da restauração não reabre uma conta após logout', async () => {
+    let concluir;
+    const app = await preparar({ restaurar: () => new Promise((resolve) => { concluir = resolve; }) });
+    await app.sair();
+    concluir({ id_usuario: 7 });
+    await estabilizar();
+    assert.equal(app.renderizar().usuario, null);
+    assert.equal(app.renderizar().carregando, false);
+});
 
 test('a importação inicia após autenticar e não é disparada pelos intervalos ou pela volta do segundo plano', async () => {
     let concluir;
